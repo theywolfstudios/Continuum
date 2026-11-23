@@ -232,7 +232,7 @@ function externalCase(name, run) {
     catch (error) { externalCases.push({ name, pass: false, error: error.message }); }
 }
 function unknown(f, reason) {
-    assert.match(f.text(), /range 1–16/);
+    assert.match(f.text(), /range 1–64/);
     assert.match(f.text(), reason);
     assert(f.checkbox(3));
     assert(!f.text().includes('saved beyond range'));
@@ -249,7 +249,7 @@ externalCase('J06 disconnected or absent socket uses direct value', () => {
     const f = assignmentFixture(); f.sampler.inputs.pop(); f.refresh(); assert.match(f.text(), /3 chunks/);
 });
 externalCase('J07 unavailable or invalid widget preserves selection', () => {
-    for (const options of [{ missing: true }, { value: 0 }, { value: 17 }, { value: 2.5 }, { value: 'bad' }]) {
+    for (const options of [{ missing: true }, { value: 0 }, { value: 65 }, { value: 2.5 }, { value: 'bad' }]) {
         const f = assignmentFixture({ ...options, saved: '1,2,3' }); unknown(f, /not available/); assert.equal(f.control.value, '1,2,3');
     }
 });
@@ -275,11 +275,11 @@ externalCase('J14 old one-two is never automatically expanded', () => {
     assert.equal(f.control.value, '1,2'); assert(!f.checkbox(3).checked);
 });
 externalCase('J15 unknown All operates over all pages', () => {
-    const f = assignmentFixture({ external: true }); f.action('▶'); f.action('▶'); f.action('All 1–16');
-    assert.equal(f.control.value, Array.from({ length: 16 }, (_, i) => i + 1).join(','));
+    const f = assignmentFixture({ external: true }); f.action('▶'); f.action('▶'); f.action('All 1–64');
+    assert.equal(f.control.value, Array.from({ length: 64 }, (_, i) => i + 1).join(','));
 });
 externalCase('J16 unknown Off clears future saved assignments', () => {
-    const f = assignmentFixture({ external: true, saved: '1,2,3,16' }); f.action('Off 1–16'); assert.equal(f.control.value, 'off');
+    const f = assignmentFixture({ external: true, saved: '1,2,3,16,64' }); f.action('Off 1–64'); assert.equal(f.control.value, 'off');
 });
 externalCase('J17 direct All and Off preserve saved future six', () => {
     const f = assignmentFixture({ saved: '6' }); f.action('All'); assert.equal(f.control.value, '1,2,3,6'); f.action('Off'); assert.equal(f.control.value, '6');
@@ -291,7 +291,7 @@ externalCase('J18 C3 updates native value and notifies once', () => {
 });
 externalCase('J19 independent helpers and multiple targets stay independent', () => {
     const f = assignmentFixture({ external: true, other: 3 }), g = assignmentFixture({ external: true });
-    f.action('All 1–16'); assert.equal(f.calls.notify, 2); assert.equal(g.control.value, 'off'); assert.equal(g.calls.notify, 0);
+    f.action('All 1–64'); assert.equal(f.calls.notify, 2); assert.equal(g.control.value, 'off'); assert.equal(g.calls.notify, 0);
 });
 externalCase('J20 repeated configure keeps callbacks layout and width', () => {
     const f = assignmentFixture({ external: true }); const callback = f.control.callback, sizes = f.calls.size;
@@ -300,7 +300,7 @@ externalCase('J20 repeated configure keeps callbacks layout and width', () => {
 });
 externalCase('J21 malformed saved selector remains disabled and unchanged', () => {
     const f = assignmentFixture({ external: true, saved: 'invalid' }); assert.equal(f.control.value, 'invalid');
-    assert(f.checkbox(3).disabled); assert(visit(f.helper.panel, (item) => item.textContent === 'All 1–16').disabled);
+    assert(f.checkbox(3).disabled); assert(visit(f.helper.panel, (item) => item.textContent === 'All 1–64').disabled);
 });
 for (const [saved, chunk] of [['1,1', 1], ['1-3,3', 3], ['2-4,1-3', 2]]) {
     externalCase(`overlapping saved selector ${saved} requires an explicit edit`, () => {

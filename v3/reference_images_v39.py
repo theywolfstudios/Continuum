@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import torch
 
+from ..constants import MAX_CHUNKS  # Shared Sampler Chunks limit.
 from ..reference import ReferenceImageBundle
 from .reference_routing import REFERENCE_SLOT_IDS, parse_chunk_selector
 
@@ -14,7 +15,6 @@ REFERENCE_IMAGES_V39_TYPE = "H3_CONTINUUM_REFERENCE_IMAGES_V39"
 REFERENCE_USE_ALL = "All chunks"
 REFERENCE_USE_PER_CHUNK = "Per chunk"
 REFERENCE_USE_OPTIONS = (REFERENCE_USE_ALL, REFERENCE_USE_PER_CHUNK)
-MAX_CHUNKS = 16  # Current Sampler schema limit; checked in integration tests.
 
 
 @dataclass(frozen=True, slots=True)

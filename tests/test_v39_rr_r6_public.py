@@ -181,6 +181,7 @@ def test_inline_helper_keeps_sparse_slot_ids_and_saved_future_chunks():
     ("1,2", [("R1",), ("R1",), ()]),
     ("1,2,3", [("R1",), ("R1",), ("R1",)]),
     (",".join(str(n) for n in range(1, 17)), [("R1",), ("R1",), ("R1",)]),
+    (",".join(str(n) for n in range(1, 65)), [("R1",), ("R1",), ("R1",)]),
     ("off", [(), (), ()]),
 ])
 def test_external_assignment_range_uses_actual_chunks_without_rewriting_saved_value(saved, expected):
