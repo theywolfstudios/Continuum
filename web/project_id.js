@@ -306,8 +306,11 @@ function removeUnusedInput(node, name) {
     node.removeInput(index);
 }
 
+// Keep equal to MAX_CHUNKS in constants.py.
+const MAX_CHUNKS = 64;
+
 function regenerateOptions(chunks) {
-    const count = Math.max(1, Math.min(16, Number.parseInt(chunks, 10) || 1));
+    const count = Math.max(1, Math.min(MAX_CHUNKS, Number.parseInt(chunks, 10) || 1));
     return ["Auto", ...Array.from({ length: count }, (_, index) => `Chunk ${index + 1}`)];
 }
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Chunks limit raised to 64
+
+- The V3.8 and V3.9 Samplers accept `Chunks` from 1 to 64 (previously 16).
+  `Regenerate From`, Take selection, prompt formats and per-chunk Reference
+  Images follow the same limit. To extend a saved run, raise `Chunks` and
+  Queue again; compatible earlier chunks are reused as before.
+- `Regenerate From` above Chunk 16 re-executes the Sampler instead of
+  returning a cached result.
+- Runs above 16 chunks add one Status line with the estimated size of the
+  decoded frames. Runs of 16 chunks or fewer keep their existing Status text.
+- Sampling Contract v6, Graph Contract v4, Run Storage and State/Session
+  formats, node IDs, socket/widget order and the shipped workflow files are
+  unchanged. Unregistered legacy V2/V3/Easy nodes keep their 16-chunk limit.
+- Package version remains 3.10.3. Checked on CPU and with the JavaScript
+  suites only; browser save/reload and GPU generation above 16 chunks have
+  not been run.
+
 ## 3.10.3 — Review and reference input fixes
 
 - Review honors a seed wired from an external INT. Local seed controls still apply to an unwired seed, and the backend checks the effective seed before reusing a Take.

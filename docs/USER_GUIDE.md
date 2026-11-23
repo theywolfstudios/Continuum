@@ -306,7 +306,7 @@ Every `H3 Continuum Load Image` has `Enable Image`. `ON` loads through ComfyUI C
 | `Base Seed` | Base for deterministic per-chunk seed derivation | Keep the value unchanged when continuing, comparing, or selecting Takes |
 | `Control After Generate` | What ComfyUI does to `Base Seed` after a Queue | `fixed` for `Review Each Chunk`, resume, and controlled comparisons |
 | `Audio Continuity` | Carries generated-audio context across boundaries | `true` for normal audiovisual generation |
-| `Chunks` | Planned total chunk count, from 1 to 16 | Enter the final total, not the number to add next |
+| `Chunks` | Planned total chunk count, from 1 to 64 | Enter the final total, not the number to add next |
 | `Seconds per Chunk` | Duration shared by every chunk | 5–15 seconds is the validated range; see duration notes below |
 | `Total Length` | Read-only `Chunks × Seconds per Chunk` | Check only; it never edits either input |
 | `Size Source` | `First Image` or `Manual` output geometry | First Image for I2VA/FL2VA; Manual for T2VA or exact dimensions |

@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib, json, re
 from typing import Any
 from ..constants import (
-    CHUNK_SECONDS_MAX,CHUNK_SECONDS_MIN,
+    CHUNK_SECONDS_MAX,CHUNK_SECONDS_MIN,MAX_CHUNKS,
     PROMPT_FORMAT_AUTO,PROMPT_FORMAT_FIXED,PROMPT_FORMAT_LIST,PROMPT_FORMAT_TIMELINE,
     PROMPT_MODE_FIXED,PROMPT_MODE_LIST,PROMPT_MODE_TIMELINE,PROMPT_PLAN_MAGIC,
 )
@@ -167,7 +167,7 @@ def resolve_prompt_mode(mode,script):
     return PROMPT_MODE_FIXED
 def make_prompt_plan(*,mode,script,chunks,chunk_seconds):
     chunks=int(chunks); chunk_seconds=float(chunk_seconds)
-    if not 1<=chunks<=16: raise PromptPlanError("chunks must be between 1 and 16")
+    if not 1<=chunks<=MAX_CHUNKS: raise PromptPlanError(f"chunks must be between 1 and {MAX_CHUNKS}")
     if not CHUNK_SECONDS_MIN<=chunk_seconds<=CHUNK_SECONDS_MAX: raise PromptPlanError(f"chunk_seconds must be between {CHUNK_SECONDS_MIN:.1f} and {CHUNK_SECONDS_MAX:.1f}")
     notes=[]; diagnostics=[]
     try:
@@ -196,7 +196,7 @@ def validate_prompt_plan(plan):
     if not isinstance(plan,dict) or plan.get("magic")!=PROMPT_PLAN_MAGIC: raise PromptPlanError("invalid H3 Continuum prompt plan")
     if int(plan.get("schema_version",-1))!=PROMPT_PLAN_SCHEMA_VERSION: raise PromptPlanError(f"unsupported prompt-plan schema {plan.get('schema_version')}; expected {PROMPT_PLAN_SCHEMA_VERSION}")
     chunks=int(plan.get("chunks",0)); prompts=plan.get("prompts"); hashes=plan.get("hashes")
-    if not 1<=chunks<=16: raise PromptPlanError("prompt-plan chunks are invalid")
+    if not 1<=chunks<=MAX_CHUNKS: raise PromptPlanError("prompt-plan chunks are invalid")
     try: chunk_seconds=float(plan.get("chunk_seconds"))
     except (TypeError,ValueError): raise PromptPlanError("prompt-plan chunk_seconds is invalid") from None
     if not CHUNK_SECONDS_MIN<=chunk_seconds<=CHUNK_SECONDS_MAX: raise PromptPlanError(f"prompt-plan chunk_seconds must be between {CHUNK_SECONDS_MIN:.1f} and {CHUNK_SECONDS_MAX:.1f}")

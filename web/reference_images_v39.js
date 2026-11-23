@@ -1,6 +1,7 @@
 const CLASS = "H3ContinuumReferenceImagesV39";
 const SAMPLER = "H3ContinuumSamplerV39";
-const MAX = 16;
+// Keep equal to MAX_CHUNKS in constants.py.
+const MAX = 64;
 const LEGACY_SAMPLER_INPUTS = new Set([
     ...Array.from({ length: 5 }, (_, index) => `reference_image_${index + 1}`),
     "image_references",
@@ -143,7 +144,7 @@ export function configureV39ReferenceImages(node) {
             reservePanelSpace(54);
             return;
         }
-        panel.append(element("div", known ? `Per-chunk assignments · ${count} chunks` : "Per-chunk assignments · range 1–16"));
+        panel.append(element("div", known ? `Per-chunk assignments · ${count} chunks` : `Per-chunk assignments · range 1–${MAX}`));
         if (!known) {
             const explanation = {
                 no_sampler: "Connect this helper to a Sampler to determine its chunk count.",
@@ -203,7 +204,7 @@ export function configureV39ReferenceImages(node) {
             const actions = element("td");
             for (const [label, on] of [["All", true], ["Off", false]]) {
                 const reset = !selected && !on;
-                const button = element("button", reset ? "Reset to Off" : known ? label : `${label} 1–16`);
+                const button = element("button", reset ? "Reset to Off" : known ? label : `${label} 1–${MAX}`);
                 button.type = "button";
                 button.disabled = !selected && !reset;
                 button.onclick = () => {

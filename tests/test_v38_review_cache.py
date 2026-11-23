@@ -118,7 +118,11 @@ def test_v37_and_easy_do_not_inherit_the_v38_cache_contract():
     ({"run_storage": "invalid"}, False),
     ({"reroll_nonce": "invalid"}, False),
     ({"reroll_from_chunk": "invalid"}, False),
-    ({"reroll_from_chunk": "Chunk 17"}, False),
+    # Every selectable chunk must invalidate the cache; a value that fails
+    # this parse falls through to "unchanged" and would never execute.
+    ({"reroll_from_chunk": "Chunk 17"}, True),
+    ({"reroll_from_chunk": "Chunk 64"}, True),
+    ({"reroll_from_chunk": "Chunk 65"}, False),
     ({"generation_mode": GENERATION_MODE_REVIEW, "run_storage": "Off"}, True),
 ])
 def test_cache_intent_handles_unresolved_inputs_without_validating_chunk_range(node_class, changes, changed):

@@ -895,6 +895,37 @@ def build_v38_diagnostics(
     )
 
 
+LONG_RUN_ADVISORY_ABOVE_CHUNKS = 16
+
+
+def long_run_decode_advisory(
+    *,
+    chunks: Any,
+    chunk_seconds: Any,
+    output_width: Any,
+    output_height: Any,
+) -> str | None:
+    """Estimate decoded IMAGE size for runs above the former 16-chunk limit.
+
+    Display only. Runs of 16 chunks or fewer return ``None`` so their Status
+    text is unchanged.
+    """
+
+    count = int(chunks)
+    if count <= LONG_RUN_ADVISORY_ABOVE_CHUNKS:
+        return None
+    seconds = float(chunk_seconds)
+    width, height = int(output_width), int(output_height)
+    frames = max(1, int(round(count * seconds * FPS)))
+    gib = frames * width * height * 3 * 4 / 1024**3
+    return (
+        f"Long run: {count} chunks x {seconds:g}s is about {frames} frames. "
+        f"Decoded at {width} x {height} they need about {gib:.1f} GiB as "
+        "float32 IMAGE data. Decode Cache Helper and the Finalize Disk-backed "
+        "buffer can keep decoded frames on disk."
+    )
+
+
 def format_v38_diagnostics(
     diagnostics: V38Diagnostics,
     *,

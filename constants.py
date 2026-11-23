@@ -12,6 +12,10 @@ CHUNK_SECONDS_DEFAULT = 5.0
 CHUNK_SECONDS_MIN = 4.0
 CHUNK_SECONDS_MAX = 30.0
 CHUNK_SECONDS_STEP = 0.1
+# Upper bound of the public Chunks setting. The sequence runtime, Run Storage
+# and prompt parser take the count as a parameter; this bounds schema widgets
+# and validation only. Legacy V2/V3/Easy node schemas keep their own limit.
+MAX_CHUNKS = 64
 CHUNK_SECONDS_TOOLTIP = (
     "Target duration shared by every chunk. 5–15 seconds is the recommended "
     "and validated range. Values above 15 seconds are supported, but VRAM "

@@ -13,6 +13,7 @@ from ..constants import (
     DIAGNOSTICS_FULL,
     DIAGNOSTICS_OFF,
     FPS,
+    MAX_CHUNKS,
     normalize_continuity_mode,
     normalize_diagnostics_mode,
 )
@@ -83,7 +84,11 @@ from .resolution import (
     H3_SIZE_SOURCE_OPTIONS,
     resolve_h3_size_source,
 )
-from .reliability_v38 import append_v38_status, build_v38_diagnostics
+from .reliability_v38 import (
+    append_v38_status,
+    build_v38_diagnostics,
+    long_run_decode_advisory,
+)
 from .review_control import (
     GENERATION_MODE_FULL_RUN,
     GENERATION_MODE_OPTIONS,
@@ -629,7 +634,7 @@ class H3ContinuumSamplerV38(H3ContinuumSamplerV37):
             {
                 "default": 0,
                 "min": 0,
-                "max": 16,
+                "max": MAX_CHUNKS,
                 "step": 1,
                 "advanced": True,
                 "display_name": "Selected Take Group",
@@ -760,8 +765,10 @@ class H3ContinuumSamplerV38(H3ContinuumSamplerV37):
                 if reroll_from_chunk is None:
                     return float("NaN")
                 # The execution path validates the actual configured chunk range.
+                # This bound must cover every selectable chunk: a value rejected
+                # here falls through to the cached result and would not run.
                 boundary = _regenerate_from_value(
-                    reroll_from_chunk, chunks=16
+                    reroll_from_chunk, chunks=MAX_CHUNKS
                 )
                 if boundary > 0:
                     return float("NaN")
@@ -822,6 +829,7 @@ class H3ContinuumSamplerV38(H3ContinuumSamplerV37):
             reference_video_size_default=REFERENCE_VIDEO_SIZE_EFFICIENT,
             build_diagnostics=build_v38_diagnostics,
             append_status=append_v38_status,
+            long_run_advisory=long_run_decode_advisory,
         )
 
 

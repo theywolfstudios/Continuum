@@ -109,6 +109,7 @@ def execute_v38_runtime_request(
     reference_video_size_default: str,
     build_diagnostics: Callable[..., Any],
     append_status: Callable[..., str],
+    long_run_advisory: Callable[..., str | None] | None = None,
 ) -> Any:
     """Call the existing runtime once and add V3.8 display-only diagnostics."""
 
@@ -126,6 +127,19 @@ def execute_v38_runtime_request(
         ]
         lines.extend(resolution.warnings)
         output = output.with_status(output.status.rstrip() + "\n" + "\n".join(lines))
+
+    if long_run_advisory is not None:
+        try:
+            advisory = long_run_advisory(
+                chunks=request.diagnostics_inputs.get("chunks"),
+                chunk_seconds=request.diagnostics_inputs.get("chunk_seconds"),
+                output_width=request.resolution.width,
+                output_height=request.resolution.height,
+            )
+        except Exception:
+            advisory = None  # Display only; never fail a finished generation.
+        if advisory:
+            output = output.with_status(output.status.rstrip() + "\n" + advisory)
 
     if request.diagnostics_mode == diagnostics_off:
         return output.as_public_tuple()

@@ -1,5 +1,22 @@
 # Public source status
 
+## Chunks limit raised to 64 — source update
+
+The V3.8 and V3.9 Samplers accept 1–64 Chunks; Regenerate From, Take selection,
+prompt formats and the V3.9 Reference Images helper share the limit. Regenerate
+From above Chunk 16 invalidates the Sampler cache. Runs above 16 chunks add one
+display-only Status line estimating decoded frame size. Sampling v6 / Graph v4,
+Run Storage, State/Session formats, node IDs, socket/widget order and official
+workflow bytes are unchanged; `run_storage.py` is not modified. Unregistered
+legacy V2/V3/Easy nodes keep their 16-chunk limit, including the Easy duration
+split. CPU/JavaScript without ComfyUI Core installed: 2,025 passed, 384 skipped
+(Core-dependent), zero failures; the same environment gave 1,996 passed, 384
+skipped before the change. All hashes in both manifests verified. Not run:
+Core-dependent tests, offline registration, live loading, browser save/reload,
+and any GPU generation, including runs above 16 chunks. Package version remains
+3.10.3; no Release or Registry submission accompanies this source update.
+See docs/ROADMAP_CHUNKS_AND_CHUNK_LORA.md.
+
 ## 3.10.3 — Review and reference input fixes
 
 Review accepts externally supplied seeds. Disconnected V3.9 reference slots retain their saved selectors until an image is connected. The current Inspector, Manager and State/Session repairs and the scope of the release checks are documented in [the 3.10.3 release notes](docs/RELEASE_NOTES_V3103.md).

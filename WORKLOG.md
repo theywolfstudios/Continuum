@@ -1,5 +1,20 @@
 # Public development log
 
+## 2026-11-22 — Chunks limit raised to 64
+
+Trace the 16-chunk limit to schema, prompt-plan validation and two frontend
+files; the sequence loop, seed derivation, physical-group planner, Reference
+Routing and Run Storage already take the count as a parameter. Introduce one
+shared limit for the public Samplers and the V3.9 Reference Images helper.
+Use the same bound in the Sampler cache check, where a rejected Regenerate
+From value otherwise falls through to the cached result. Leave the Easy
+duration split and unregistered legacy schemas at 16 because the split
+decides how an existing duration becomes chunks. Add a display-only decoded
+size estimate for runs above 16 chunks. Cover the public schema, cache check,
+prompt plan at 64 and 65 chunks, Reference selectors above 16, a 16-chunk run
+extended to 24 with its prefix reused and source files untouched, and the
+unchanged legacy limits. CPU and JavaScript only; see PROJECT_STATE.md.
+
 ## 2026-11-18 — Review preflight and inactive reference slots
 
 Reproduced the wired-seed Review stop and the stale, disconnected reference assignment on the previous main. Tested wired and unwired seeds, inactive selectors, and validation after reconnect. See the [3.10.3 release checks](docs/RELEASE_NOTES_V3103.md) for the CPU and GPU results.

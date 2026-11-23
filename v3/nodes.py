@@ -11,6 +11,7 @@ from ..constants import (
     CHUNK_SECONDS_STEP,
     CHUNK_SECONDS_TOOLTIP,
     DIAGNOSTICS_FULL,
+    MAX_CHUNKS,
 )
 from ..v2.nodes import (
     CATEGORY,
@@ -36,7 +37,7 @@ from ..timeline_video import TIMELINE_VIDEO_SIZE_OPTIONS
 
 REGENERATE_AUTO = "Auto"
 REGENERATE_OPTIONS = (REGENERATE_AUTO,) + tuple(
-    f"Chunk {index}" for index in range(1, 17)
+    f"Chunk {index}" for index in range(1, MAX_CHUNKS + 1)
 )
 
 
@@ -786,7 +787,7 @@ class H3ContinuumSamplerProduction(H3ContinuumSamplerV3):
                     {
                         "default": 3,
                         "min": 1,
-                        "max": 16,
+                        "max": MAX_CHUNKS,
                         "step": 1,
                         "tooltip": "Number of sequential Continuum chunks to generate.",
                     },
