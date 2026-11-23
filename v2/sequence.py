@@ -488,6 +488,8 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
         FOLLOW_PLAN_KEY, FollowVideoSource, build_follow_group_conditioning,
     )
     _reference_routing_runtime = _REFERENCE_ROUTING_RUNTIME.get()
+    from ..v3.lora_runtime import active_lora_plan_runtime
+    _lora_plan_runtime = active_lora_plan_runtime()
     following_video = isinstance(reference_video_source, FollowVideoSource)
     storage_controller=get_active_run_storage()
     if _reference_routing_runtime is not None:
@@ -584,6 +586,13 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
             )
         except ValueError as exc:
             raise SequenceRuntimeError(str(exc)) from exc
+    lora_group_contracts=None
+    if _lora_plan_runtime is not None:
+        from ..v3.lora_plan import LoraPlanError
+        try:
+            lora_group_contracts=_lora_plan_runtime.compile(chunks=chunks,terminal_merge_enabled=terminal_merge_enabled)
+        except LoraPlanError as exc:
+            raise SequenceRuntimeError(str(exc)) from exc
     terminal_prompt=None
     terminal_prompt_policy=None
     if terminal_merge_enabled:
@@ -631,7 +640,7 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
                 has_reference=False,
             ) if reference_storage_plan is not None else conditioning_mode
         )
-        stored_session=storage_controller.prepare(model=model,model_fingerprint_value=current_model_fingerprint,clip=clip,video_vae=video_vae,sampler=sampler,sigmas=sigmas,prompt_plan=plan,width=width,height=height,chunk_seconds=chunk_seconds,continuity=continuity,audio_continuity=audio_continuity,base_seed=base_seed,reroll_from_chunk=reroll_from_chunk,reroll_nonce=reroll_nonce,first_frame_hash=assets.first_frame_hash,last_frame_hash=assets.last_frame_hash,identity_hash=sequence_identity_hash,strict_compatibility=strict_compatibility,existing_session=session,reference_contract=reference_assets.contract if reference_assets is not None else None,conditioning_mode=storage_conditioning_mode,reference_audio_contract=reference_audio_source.contract if reference_audio_source is not None else None,reference_audio_vae=reference_audio_vae,driving_audio_contract=driving_audio_source.contract if driving_audio_source is not None else None,driving_audio_vae=driving_audio_vae,reference_video_contract=reference_video_source.contract if reference_video_source is not None else None,timeline_video_contract=timeline_video_source.contract if timeline_video_source is not None else None,guide_contract=guide_source.contract if guide_source is not None else None,execution_semantics=_terminal_execution_semantics(merge_enabled=terminal_merge_enabled,prompt_policy=terminal_prompt_policy,continuation_transport=continuation_transport),reference_storage_plan=reference_storage_plan)
+        stored_session=storage_controller.prepare(model=model,model_fingerprint_value=current_model_fingerprint,clip=clip,video_vae=video_vae,sampler=sampler,sigmas=sigmas,prompt_plan=plan,width=width,height=height,chunk_seconds=chunk_seconds,continuity=continuity,audio_continuity=audio_continuity,base_seed=base_seed,reroll_from_chunk=reroll_from_chunk,reroll_nonce=reroll_nonce,first_frame_hash=assets.first_frame_hash,last_frame_hash=assets.last_frame_hash,identity_hash=sequence_identity_hash,strict_compatibility=strict_compatibility,existing_session=session,reference_contract=reference_assets.contract if reference_assets is not None else None,conditioning_mode=storage_conditioning_mode,reference_audio_contract=reference_audio_source.contract if reference_audio_source is not None else None,reference_audio_vae=reference_audio_vae,driving_audio_contract=driving_audio_source.contract if driving_audio_source is not None else None,driving_audio_vae=driving_audio_vae,reference_video_contract=reference_video_source.contract if reference_video_source is not None else None,timeline_video_contract=timeline_video_source.contract if timeline_video_source is not None else None,guide_contract=guide_source.contract if guide_source is not None else None,execution_semantics=_terminal_execution_semantics(merge_enabled=terminal_merge_enabled,prompt_policy=terminal_prompt_policy,continuation_transport=continuation_transport),reference_storage_plan=reference_storage_plan,lora_group_contracts=lora_group_contracts,lora_plan_audit=(_lora_plan_runtime.audit() if _lora_plan_runtime is not None else None))
         reroll_nonce=storage_controller.effective_reroll_nonce
         review_execution=getattr(storage_controller,"review_execution",None)
         if review_execution is not None:
@@ -942,6 +951,7 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
         if memory_collector is not None:
             capture_memory(memory_collector, "finish_phase", phase="conditioning")
     initial_frame_count=align_frame_count_up(int(round(chunk_seconds*FPS))); retained_frames=sum(int(entry["plan"]["net_frames"]) for entry in entries); sampling_reports=[]
+    if _lora_plan_runtime is not None: sampling_reports.extend(_lora_plan_runtime.plan_report_lines())
     context_diagnostics=ContextDiagnosticsTracker() if bool(debug) else None
     if context_diagnostics is not None:
         if entries:
@@ -1149,7 +1159,7 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
         if layout_validation_profiler is not None: clone_kwargs["validation_profiler"]=layout_validation_profiler
         if packed_row_planner is not None: clone_kwargs["packed_row_planner"]=packed_row_planner
         if not reusing_group:
-            chunk_model=clone_model_for_chunk(model,**clone_kwargs)
+            chunk_model=clone_model_for_chunk(model if _lora_plan_runtime is None else _lora_plan_runtime.model_for_group(model,physical_group=sequence_index+1),**clone_kwargs)
         if memory_collector is not None:
             capture_memory(memory_collector, "finish_phase", phase="group_prepare", physical_group=sequence_index+1, logical_chunks=(sequence_index+1,))
             capture_memory(memory_collector, "start_phase", phase="refine_context", physical_group=sequence_index+1, logical_chunks=(sequence_index+1,))
@@ -1262,6 +1272,7 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
             capture_memory(memory_collector, "finish_phase", phase="cpu_commit_validation", physical_group=sequence_index+1, logical_chunks=(sequence_index+1,))
         retained_frames+=int(chunk_plan["net_frames"])
         sampling_reports.append(f"chunk {sequence_index+1}/{chunks}: seed={seed}, frames={chunk_plan['total_frames']}, trim={chunk_plan['trim_frames']}, retained_total={retained_frames}, context={context_frames} ({reason}), motion={motion_score:.6f}, "+(f"interop=emitted actual_prefix={CONTINUUM_ACTUAL_PREFIX_STEPS} consumer=not_observable" if context_interop_emitted else "interop=not_emitted"))
+        if _lora_plan_runtime is not None and _lora_plan_runtime.applied_report(sequence_index+1): sampling_reports.append(f"chunk {sequence_index+1}/{chunks}: "+_lora_plan_runtime.applied_report(sequence_index+1))
         del sampled,latent,conditioning,chunk_model,chunk_cache
         if timeline_video_source is not None and timeline_video_assets is not None: del timeline_video_assets
         if memory_collector is not None:
@@ -1447,7 +1458,10 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
         conditioning=attach_driving_audio(conditioning,driving_audio_latent)
         if not terminal_reused:
             chunk_model=clone_model_for_chunk(
-                model,
+                (
+                    model if _lora_plan_runtime is None
+                    else _lora_plan_runtime.model_for_group(model,physical_group=terminal_physical_group)
+                ),
                 strict=bool(strict_compatibility),
                 debug=bool(debug),
                 chunk_index=physical_clip_index,
@@ -1595,6 +1609,7 @@ def _run_runtime_internal(*,model:Any,clip:Any,video_vae:Any,audio_vae:Any,sampl
                 )
             if memory_collector is not None:
                 capture_memory(memory_collector, "finish_phase", phase="cpu_commit_validation", physical_group=terminal_physical_group, logical_chunks=terminal_logical_chunks)
+            if _lora_plan_runtime is not None and _lora_plan_runtime.applied_report(terminal_physical_group): sampling_reports.append(f"terminal physical sample: "+_lora_plan_runtime.applied_report(terminal_physical_group))
             del sampled,sampled_video,sampled_audio,logical_parts,latent,conditioning,chunk_model
             del video_part,audio_part
             if memory_collector is not None:

@@ -21,6 +21,7 @@ EXPECTED_PUBLIC_NODE_DISPLAY_NAMES = {
     "H3ContinuumSecondPassV35": "H3 Continuum Second Pass",
     "H3DecodeCacheHelper": "Decode Cache Helper",
     "H3ContinuumVideoAdapter": "H3 Continuum Video Adapter",
+    "H3ContinuumLoraPlan": "H3 Continuum LoRA Plan (Experimental)",
 }
 
 

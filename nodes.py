@@ -457,6 +457,10 @@ from .decode_cache.nodes import H3DecodeCacheHelper
 NODE_CLASS_MAPPINGS["H3DecodeCacheHelper"] = H3DecodeCacheHelper
 NODE_DISPLAY_NAME_MAPPINGS["H3DecodeCacheHelper"] = "Decode Cache Helper"
 
+from .v3.lora_plan_nodes import H3ContinuumLoraPlan
+
+NODE_CLASS_MAPPINGS["H3ContinuumLoraPlan"] = H3ContinuumLoraPlan
+
 # V3.8 exports only its audited launch surface. The imports and merged mappings
 # above intentionally stay in place because the V3.8 implementation still
 # inherits and reuses historical modules internally.
@@ -473,6 +477,7 @@ _PUBLIC_NODE_DISPLAY_NAMES = {
     "H3ContinuumVideoAdapter": "H3 Continuum Video Adapter",
     "H3ContinuumSecondPassV35": "H3 Continuum Second Pass",
     "H3DecodeCacheHelper": "Decode Cache Helper",
+    "H3ContinuumLoraPlan": "H3 Continuum LoRA Plan (Experimental)",
 }
 NODE_CLASS_MAPPINGS = {
     node_id: NODE_CLASS_MAPPINGS[node_id]

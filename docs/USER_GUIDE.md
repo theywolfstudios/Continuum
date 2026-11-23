@@ -67,6 +67,30 @@ Earlier browser checks covered the previous V3.9 controls. The new helper has GP
 
 **Version boundary:** V3.8X2 package 3.8.3 and V3.9.0 are separate workflows. This update does not create a V3.8X2 or V3.9 GitHub Release, tag, maintenance branch, or Registry version; it does not remove any older Release. The existing [`v3.8.0` tag](https://github.com/ukr8b3g-cmyk/ComfyUI-H3-Continuum/tree/v3.8.0) remains the reproducible V3.8.0 baseline.
 
+## Per-chunk LoRAs — LoRA Plan (Experimental)
+
+**Status:** new on main and not yet GPU-tested. The storage and scheduling logic is covered by CPU tests; loading and applying LoRAs inside ComfyUI, the node's appearance in the browser, and behaviour with Spectrum, SageAttention, Sol-Attn or quantised model loaders have not been run. Try it on a new Run before relying on it.
+
+Use **H3 Continuum LoRA Plan (Experimental)** to apply a model-only LoRA to some chunks and not others.
+
+1. Add the node (`MiniMax H3/Continuum/Input`) and choose a file in `LoRA`.
+2. Set `Strength`. It is the model strength of Core's model-only LoRA loader; `0` disables the row.
+3. Enter the chunks in `Chunks`: `all`, `off`, or numbers and ranges such as `1,3-5`.
+4. Connect `lora_plan` to the V3.9 Sampler's `LoRA Plan (Optional, Experimental)` input.
+5. For another LoRA, add a second LoRA Plan node and connect the first node's output to its `Previous LoRA Plan (Optional)` input. Connect the last node to the Sampler.
+
+| Situation | What happens |
+|---|---|
+| A LoRA should apply to every chunk (for example Turbo) | Leave it on the MODEL input with your usual LoRA loader. The plan is only for LoRAs that differ between chunks. |
+| A chunk number is above the Sampler's `Chunks` | It is ignored until the run is that long. |
+| First and Last Image are both connected | The last two chunks are sampled together, so give both the same LoRAs. Otherwise the Sampler stops before sampling and names the two chunks. |
+| The LoRA file is missing | The Sampler stops before any chunk is generated. |
+| The LoRA needs a trigger word | Put it in that chunk's section of the Sequence Prompt. |
+
+**Saved runs.** With `Progress = On`, changing the plan keeps every chunk before the first chunk whose LoRAs changed, and regenerates from there. Attaching a plan to an existing V3.9 run works the same way: a LoRA first used on Chunk 4 keeps Chunks 1–3. A LoRA is recognised by its file content, so renaming the file changes nothing and replacing it counts as a change. Earlier Takes stay in Render History.
+
+**Limits.** Model strength only, no CLIP strength. The sampler and sigma schedule are shared by all chunks, so a Turbo LoRA on only some chunks is not supported. Second Pass uses its own MODEL input and does not read the plan. Core re-patches the model weights when the LoRA set changes between chunks, which adds time at that boundary. The V3.8 Sampler does not have this input. Details: [LoRA Plan contract](LORA_PLAN_CONTRACT_V1.md).
+
 ## Loader persistence repair on main (2026-09-21, after 3.8.3)
 
 The current paired V3.8X2 workflows now use **Core Load Audio** and **Core Load Video -> H3 Continuum Video Adapter**. The adapter has Force Rate (default 24) and IMAGE/AUDIO outputs, but **no Enable switch or file selector**. Core owns video selection/upload/save; the established duration-preserving frame selection is reused and audio is passed unchanged. To disable Video Guide, bypass the adapter or the whole video-input group; do not bypass only Load Video while leaving its required-input adapter active.

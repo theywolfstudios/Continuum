@@ -1,5 +1,25 @@
 # Public source status
 
+## Per-chunk LoRA Plan (Experimental) — source update
+
+Add the H3 Continuum LoRA Plan helper and an optional `lora_plan` input,
+appended last, on the V3.9 Sampler. The plan assigns model-only LoRAs to
+selected chunks; they are applied per physical group inside the Sampler with
+Core's model-only LoRA calls. Storage identity is per group and outside the
+common contract section (docs/LORA_PLAN_CONTRACT_V1.md): without a plan the
+Sampling Contract is byte-identical, and chunks before the first changed
+LoRA are reused. Sampling v6 / Graph v4, stored formats, existing node IDs,
+socket/widget order and official workflow bytes are unchanged. Public
+registration is thirteen nodes. CPU/JavaScript without ComfyUI Core
+installed: 2,060 passed, 384 skipped (Core-dependent). One existing test,
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache, fails
+intermittently in this environment on unchanged code as well. All hashes in
+both manifests verified. Not run: Core-dependent tests, real LoRA loading and patching,
+offline registration, live loading, browser display and save/reload, and
+any GPU generation; Spectrum, SageAttention, Sol-Attn, KJ Preview Override
+and quantised model loaders are untested with a plan. Package version
+remains 3.10.3; no Release or Registry submission accompanies this update.
+
 ## Chunks limit raised to 64 — source update
 
 The V3.8 and V3.9 Samplers accept 1–64 Chunks; Regenerate From, Take selection,

@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Per-chunk LoRA Plan (Experimental)
+
+- Add **H3 Continuum LoRA Plan (Experimental)**: one model-only LoRA, a
+  strength and a chunk selection (`all`, `off`, `1,3-5`). Chain nodes to add
+  more LoRAs. Connect it to the new optional `LoRA Plan` input of the V3.9
+  Sampler. LoRAs for every chunk stay on the MODEL input as before.
+- With saved progress, changing the plan keeps every chunk before the first
+  chunk whose LoRAs changed. Attaching a plan to an existing V3.9 run keeps
+  the chunks before its first LoRA. A LoRA is identified by file content.
+- With First and Last Image both connected, the last two chunks must use the
+  same LoRAs. A missing LoRA file stops the Sampler before sampling.
+- Without a connected plan the Sampling Contract is byte-identical to
+  before. Sampling Contract v6, Graph Contract v4, Run Storage and
+  State/Session formats, existing node IDs and socket/widget order and the
+  shipped workflow files are unchanged. Public registration is now thirteen
+  nodes. Package version remains 3.10.3.
+- Limits: model strength only; one sampler/sigma schedule for all chunks;
+  Second Pass does not read the plan; V3.9 Sampler only.
+- Checked on CPU only. Not run against ComfyUI Core, in a browser or on a
+  GPU. See docs/LORA_PLAN_CONTRACT_V1.md.
+
 ## Unreleased — Chunks limit raised to 64
 
 - The V3.8 and V3.9 Samplers accept `Chunks` from 1 to 64 (previously 16).
