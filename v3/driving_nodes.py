@@ -857,10 +857,19 @@ class H3ContinuumSamplerV39(H3ContinuumSamplerV38):
             {"display_name": "Reference Images (Optional)",
              "tooltip": "Connect H3 Continuum Reference Images V3.9; assign chunks there."},
         )
+        # Appended last so every existing socket keeps its position. Leaving
+        # it disconnected is identical to a Sampler without this input.
+        from .lora_plan import LORA_PLAN_TYPE
+        optional["lora_plan"] = (
+            LORA_PLAN_TYPE,
+            {"display_name": "LoRA Plan (Optional, Experimental)",
+             "tooltip": "Connect H3 Continuum LoRA Plan to apply model-only LoRAs to selected chunks. "
+                        "LoRAs for every chunk can stay on the MODEL input."},
+        )
         schema["optional"] = optional
         return schema
 
-    def run(self, reference_images=None, **kwargs):
+    def run(self, reference_images=None, lora_plan=None, **kwargs):
         # The public V3.9 schema owns a single Reference input. Stale API
         # keys must not create a second route around that input.
         for name in (
@@ -875,7 +884,9 @@ class H3ContinuumSamplerV39(H3ContinuumSamplerV38):
         kwargs.update({f"reference_image_{index}": image
                        for index, image in enumerate(direct, start=1)})
         kwargs["image_references"] = extra
-        outputs = super().run(_reference_routing_settings=selectors, **kwargs)
+        from .lora_runtime import lora_plan_scope, make_lora_plan_runtime
+        with lora_plan_scope(make_lora_plan_runtime(lora_plan)):
+            outputs = super().run(_reference_routing_settings=selectors, **kwargs)
         if not isinstance(outputs, tuple) or len(outputs) < 4:
             return outputs
         from .reference_plan_inspector import format_reference_plan

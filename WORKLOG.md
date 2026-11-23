@@ -1,5 +1,24 @@
 # Public development log
 
+## 2026-11-23 — Per-chunk LoRA Plan (Experimental)
+
+LoRA patches are part of the common model identity, so changing a LoRA on the
+MODEL input restarts a saved run. Record per-chunk LoRAs the way V3.9
+Reference Routing records per-chunk images: one descriptor per physical
+group, a per-chunk group hash and the group hashes in the lineage, all
+outside the common section. Write records only for groups that receive a
+LoRA, so an unconnected plan and untouched chunks keep their existing
+hashes and a plan can be attached to an existing run. Build one patched
+MODEL per distinct LoRA set and clone it per group; Core keeps the patch
+identity across clones and assigns a new one when patches are added, so this
+avoids a weight re-patch between chunks that share a set. Check the Core
+calls against current Core source. Cover the schedule, the terminal-pair
+rule, record validation, the unchanged contract without a plan, prefix
+reuse after attaching, changing and removing a plan through real Run
+Storage prepare/commit/finalize, the runtime with substituted file and
+patch functions, the public schema and a three-chunk sequence. CPU only;
+see PROJECT_STATE.md.
+
 ## 2026-11-22 — Chunks limit raised to 64
 
 Trace the 16-chunk limit to schema, prompt-plan validation and two frontend

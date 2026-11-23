@@ -67,6 +67,11 @@ from .v3.reference_storage_contract import (
     session_routing_settings,
     validate_reference_group_contracts,
 )
+from .v3.lora_plan import (
+    LoraPlanError,
+    lora_group_sha_by_chunk,
+    validate_lora_group_contracts,
+)
 
 
 RUN_STORAGE_SCHEMA_VERSION = 3
@@ -1234,6 +1239,8 @@ def _apply_nonce_contract(
         for group_record in routed_groups:
             for chunk in group_record["descriptor"]["logical_chunks"]:
                 routed_by_chunk[int(chunk)] = group_record["sha256"]
+    lora_groups = result.get("lora_group_contracts")
+    lora_by_chunk = lora_group_sha_by_chunk(lora_groups) if lora_groups else {}
     for position, prompt_hash in enumerate(result["prompt_hashes"]):
         number = position + 1
         affected = boundary > 0 and number >= boundary
@@ -1247,6 +1254,10 @@ def _apply_nonce_contract(
         }
         if routed_groups is not None:
             chunk_contract["physical_group_reference_sha256"] = routed_by_chunk[number]
+        if number in lora_by_chunk:
+            # Only chunks that receive a LoRA carry this field, so every other
+            # chunk keeps the contract hash it has without a LoRA Plan.
+            chunk_contract["physical_group_lora_sha256"] = lora_by_chunk[number]
         timeline_chunks = result.get("timeline_video_chunk_contracts") or []
         if position < len(timeline_chunks):
             chunk_contract["timeline_video"] = dict(timeline_chunks[position])
@@ -1289,6 +1300,10 @@ def _nonce_lineage_hash(
     if "reference_group_contracts" in contract:
         identity["reference_group_hashes"] = [
             record["sha256"] for record in contract["reference_group_contracts"]
+        ]
+    if "lora_group_contracts" in contract:
+        identity["lora_group_hashes"] = [
+            record["sha256"] for record in contract["lora_group_contracts"]
         ]
     return _hash(identity)
 
@@ -1375,6 +1390,7 @@ def build_sampling_contract(
     guide_contract: dict[str, Any] | None = None,
     execution_semantics: dict[str, Any] | None = None,
     reference_storage_plan: ReferenceStoragePlan | None = None,
+    lora_group_contracts: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], bool, list[str]]:
     if reference_storage_plan is not None and reference_contract is not None:
         raise RunStorageError("routed Reference plan cannot use legacy Reference contract")
@@ -1537,6 +1553,18 @@ def build_sampling_contract(
             ),
         )
         contract["reference_group_contracts"] = routed_groups
+    if lora_group_contracts:
+        # Absent or empty adds nothing: the contract of a run without a LoRA
+        # Plan is unchanged. See docs/LORA_PLAN_CONTRACT_V1.md.
+        try:
+            contract["lora_group_contracts"] = validate_lora_group_contracts(
+                list(lora_group_contracts), chunk_count=chunks,
+                terminal_merge_enabled=(
+                    (execution_semantics or {}).get("flf_execution") == "terminal_merged_10s_seed_v2"
+                ),
+            )
+        except LoraPlanError as exc:
+            raise RunStorageError(f"LoRA Plan contract is invalid: {exc}") from exc
     lineage_sha256 = _nonce_lineage_hash(
         contract,
         timeline_video_chunk_contracts=timeline_chunk_contracts,
@@ -1786,6 +1814,23 @@ def _manifest_sampling_identity(manifest: dict[str, Any]) -> tuple[str, str]:
                        item.get("physical_group_reference_sha256") != expected[index + 1]
                        for index, item in enumerate(chunks))):
             raise RunStorageError("stored Reference group/chunk contracts disagree")
+    lora_groups = contract.get("lora_group_contracts")
+    lora_chunks = contract.get("chunk_contracts")
+    if lora_groups is not None or (isinstance(lora_chunks, list) and any(
+            isinstance(item, dict) and "physical_group_lora_sha256" in item
+            for item in lora_chunks)):
+        try:
+            expected_lora = lora_group_sha_by_chunk(validate_lora_group_contracts(
+                lora_groups, chunk_count=int(contract["chunk_count"]),
+                terminal_merge_enabled=_terminal_merge_enabled(contract),
+            ))
+        except (LoraPlanError, KeyError, TypeError, ValueError) as exc:
+            raise RunStorageError(f"stored LoRA group contract is invalid: {exc}") from exc
+        if (not isinstance(lora_chunks, list)
+                or any(not isinstance(item, dict) or
+                       item.get("physical_group_lora_sha256") != expected_lora.get(index + 1)
+                       for index, item in enumerate(lora_chunks))):
+            raise RunStorageError("stored LoRA group/chunk contracts disagree")
     contract_revision_id, contract_sha256 = revision_identity(contract)
     if str(manifest.get("contract_sha256", "")) != contract_sha256:
         raise RunStorageError("stored sampling contract SHA-256 is invalid")
@@ -2970,7 +3015,7 @@ class RunStorageController:
                     "Take selection cannot be combined with manual Regenerate From"
                 )
             source_lineage = str(contract.get("nonce_lineage_sha256", ""))
-            if "reference_group_contracts" in contract:
+            if "reference_group_contracts" in contract or "lora_group_contracts" in contract:
                 _, all_takes, _ = self._provenance_catalog()
                 selected_take = all_takes.get(self.take_revision_id)
                 if selected_take is not None:
@@ -3001,8 +3046,12 @@ class RunStorageController:
                 if (len(compatible_entries) != selected_end
                         or compatible_records != candidate["records"]):
                     failed_group = len(compatible_entries) + 1
+                    plan_label = (
+                        "Reference plan" if "reference_group_contracts" in contract
+                        else "LoRA Plan"
+                    )
                     raise RunStorageError(
-                        f"selected Take is incompatible with the new Reference plan "
+                        f"selected Take is incompatible with the new {plan_label} "
                         f"at physical group starting with chunk {failed_group}; "
                         "choose an earlier compatible Take or deselect Take and Regenerate From"
                     )
@@ -3227,6 +3276,8 @@ class RunStorageController:
         guide_contract: dict[str, Any] | None = None,
         execution_semantics: dict[str, Any] | None = None,
         reference_storage_plan: ReferenceStoragePlan | None = None,
+        lora_group_contracts: list[dict[str, Any]] | None = None,
+        lora_plan_audit: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
         if existing_session is not None:
             raise RunStorageError("Run Storage cannot be combined with an explicit Session")
@@ -3275,6 +3326,7 @@ class RunStorageController:
             guide_contract=guide_contract,
             execution_semantics=execution_semantics,
             reference_storage_plan=reference_storage_plan,
+            lora_group_contracts=lora_group_contracts,
         )
         self.contract = contract
         if self.review_generation_mode is not None or self.review_action is not None:
@@ -3458,6 +3510,11 @@ class RunStorageController:
             self.manifest["reference_routing_audit"] = (
                 (exact or {}).get("reference_routing_audit")
                 or reference_storage_plan.audit()
+            )
+        if lora_plan_audit and "lora_group_contracts" in contract:
+            # Display names only; identity is the file SHA-256 in the contract.
+            self.manifest["lora_plan_audit"] = (
+                (exact or {}).get("lora_plan_audit") or list(lora_plan_audit)
             )
         if exact is not None and isinstance(exact.get("prefix_import"), dict):
             self.manifest["prefix_import"] = dict(exact["prefix_import"])
