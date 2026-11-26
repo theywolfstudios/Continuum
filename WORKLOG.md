@@ -1,5 +1,27 @@
 # Public development log
 
+## 2026-11-26 — Core sampling allocations between chunks
+
+A V3.9 run on a 32 GB card stopped in the Sampler with an out-of-memory
+error that requested 7.07 GiB while CUDA reported 14.09 GiB free,
+intermittently and apparently after ComfyUI had been running for a while.
+Read Core instead of measuring, because no GPU was available: Core records a
+forward's GPU allocations in a per-thread allocation graph, H3's forward
+opens and closes that graph on every step, and the executor releases it when
+the node returns. A Core sampler node is one sampling run; a Continuum
+Sampler samples every physical group in one node, at token counts that
+differ between groups. Core's own multi-phase loops run the node-boundary
+cleanup between phases, and its writable-model path synchronizes before
+doing so. Do the same after each completed physical sample at the three
+places the package calls Core's guider, under the executor's own condition
+and through the public function only. Leave a failed sample to Core, never
+fail a sample because the cleanup failed, and add an environment opt-out so
+both behaviors can be compared on one machine. Do not add feed-forward
+chunking here: an external MODEL patch provides it and accelerators stay
+external. Cover the call and its order, every condition under which nothing
+is called, the failure path, the opt-out and the three call sites with
+recording stand-ins for Core. CPU only; see PROJECT_STATE.md.
+
 ## 2026-11-23 — Per-chunk LoRA Plan (Experimental)
 
 LoRA patches are part of the common model identity, so changing a LoRA on the

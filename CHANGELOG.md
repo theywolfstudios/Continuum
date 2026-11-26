@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Core sampling allocations released between chunks
+
+- Every sampling path of the package (the Continuum Samplers and Second
+  Pass) now returns ComfyUI Core's sampling allocations after each physical
+  sample instead of holding them until the node finishes. This targets an
+  out-of-memory stop in which a later chunk is refused one large request
+  while the device still reports free memory (reported on a 32 GB card:
+  7.07 GiB requested with 14.09 GiB free).
+- The package calls Core's own node-boundary cleanup
+  (`comfy.model_prefetch.cleanup_prefetch_queues`), and only when Core's
+  allocator is enabled. A Core without that cleanup is unaffected. Core's
+  console line `Comfy model compiler graph breaks: N, rogues: M` now appears
+  once per chunk instead of once per node.
+- Set the environment variable `H3_CONTINUUM_KEEP_CORE_ALLOCATIONS=1` before
+  starting ComfyUI to keep the previous behavior.
+- No sampling input, seed or tensor is read or changed. Sampling Contract
+  v6, Graph Contract v4, Run Storage and State/Session formats, node IDs,
+  socket/widget order and the shipped workflow files are unchanged. Package
+  version remains 3.10.3.
+- Checked on CPU only, with Core replaced by recording stand-ins. Not run
+  against ComfyUI Core or on a GPU: the reported stop has not been
+  reproduced, and whether this removes it has not been measured.
+
 ## Unreleased — Per-chunk LoRA Plan (Experimental)
 
 - Add **H3 Continuum LoRA Plan (Experimental)**: one model-only LoRA, a

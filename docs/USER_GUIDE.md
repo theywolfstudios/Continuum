@@ -91,6 +91,20 @@ Use **H3 Continuum LoRA Plan (Experimental)** to apply a model-only LoRA to some
 
 **Limits.** Model strength only, no CLIP strength. The sampler and sigma schedule are shared by all chunks, so a Turbo LoRA on only some chunks is not supported. Second Pass uses its own MODEL input and does not read the plan. Core re-patches the model weights when the LoRA set changes between chunks, which adds time at that boundary. The V3.8 Sampler does not have this input. Details: [LoRA Plan contract](LORA_PLAN_CONTRACT_V1.md).
 
+## Out of memory in a later chunk while memory is free
+
+**Status:** new on main and not GPU-tested. The cause was read from ComfyUI Core source. The reported stop has not been reproduced, and whether this change removes it has not been measured.
+
+**Symptom.** A long run stops in the Sampler or Second Pass with `torch.OutOfMemoryError`, and the message shows a `Requested` size smaller than `Free (according to CUDA)`. The change below concerns chunks after the first of a Queue.
+
+**What changed.** ComfyUI Core keeps the GPU allocations of sampling until the node finishes. A Continuum run samples every chunk inside one node, so each chunk inherited what the earlier chunks left. The package now returns those allocations to Core after every chunk, the way Core does between two nodes. The generated result, saved runs and workflows are not affected. In the ComfyUI console, Core's `Comfy model compiler graph breaks: N, rogues: M` line now appears once per chunk.
+
+| Situation | What to do |
+|---|---|
+| You want the previous behavior, or want to compare the two | Set the environment variable `H3_CONTINUUM_KEEP_CORE_ALLOCATIONS=1` before starting ComfyUI. |
+| The stop remains, still with free memory reported | Start ComfyUI with `--disable-comfy-compiler`, Core's own switch for this allocator, and note whether the stop remains. Include the console's `graph breaks` line when reporting it. |
+| The request is larger than the free memory | The chunk itself does not fit. Lower `Seconds per Chunk` or the resolution. An external MODEL patch that runs H3's feed-forward in pieces, such as KJNodes' `MiniMax H3 Chunk FeedForward`, lowers the largest single request; it is not part of this package and has not been tested with it. |
+
 ## Loader persistence repair on main (2026-09-21, after 3.8.3)
 
 The current paired V3.8X2 workflows now use **Core Load Audio** and **Core Load Video -> H3 Continuum Video Adapter**. The adapter has Force Rate (default 24) and IMAGE/AUDIO outputs, but **no Enable switch or file selector**. Core owns video selection/upload/save; the established duration-preserving frame selection is reused and audio is passed unchanged. To disable Video Guide, bypass the adapter or the whole video-input group; do not bypass only Load Video while leaving its required-input adapter active.

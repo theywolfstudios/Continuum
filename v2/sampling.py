@@ -6,6 +6,7 @@ from typing import Any
 
 import torch
 
+from ..core_allocations import release_sampling_allocations
 from ..state import extract_av_streams
 
 
@@ -91,6 +92,8 @@ def sample_chunk(
         seed=int(seed),
     )
     samples = samples.to(comfy.model_management.intermediate_device())
+    # Every chunk samples inside this one node; end it the way Core ends a node.
+    release_sampling_allocations()
     output = working.copy()
     output.pop("downscale_ratio_spacial", None)
     output.pop("downscale_ratio_temporal", None)
