@@ -1,5 +1,29 @@
 # Public source status
 
+## Core sampling allocations between chunks — source update
+
+After each completed physical sample, the Continuum Samplers and Second Pass
+run ComfyUI Core's node-boundary allocation cleanup
+(`comfy.model_prefetch.cleanup_prefetch_queues`, after
+`comfy.model_management.synchronize`) when Core's allocator is enabled. This
+targets an out-of-memory stop in a later chunk while free device memory is
+reported. `H3_CONTINUUM_KEEP_CORE_ALLOCATIONS=1` keeps the previous
+behavior. No sampling input or tensor is read or changed; Sampling v6 /
+Graph v4, stored formats, node IDs, socket/widget order and official
+workflow bytes are unchanged. CPU/JavaScript without ComfyUI Core installed:
+2,081 passed, 384 skipped (Core-dependent) and one failure, twice in a row;
+the same environment gave 2,060 passed, 384 skipped before the change. The
+failure is the existing
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache, which is
+intermittent here on unchanged code as well: run alone, it failed 3 of 8
+times on the previous main and 3 of 8 times with this change. All hashes in
+both manifests verified. Not run: Core-dependent tests, live loading and any GPU
+generation. The cause was read from Core source; the reported stop has not
+been reproduced and the change has not been measured against it. Spectrum,
+SageAttention, Sol-Attn, KJ Preview Override and multi-GPU setups are
+untested with it. Package version remains 3.10.3; no Release or Registry
+submission accompanies this update.
+
 ## Per-chunk LoRA Plan (Experimental) — source update
 
 Add the H3 Continuum LoRA Plan helper and an optional `lora_plan` input,

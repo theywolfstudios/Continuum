@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import torch
 
+from ..core_allocations import release_sampling_allocations
 from ..state import extract_av_streams
 
 
@@ -150,6 +151,7 @@ def sample_refine_chunk(
         seed=int(seed),
     )
     samples = samples.to(model_management.intermediate_device())
+    release_sampling_allocations()
     output = working.copy()
     output.pop("downscale_ratio_spacial", None)
     output.pop("downscale_ratio_temporal", None)
