@@ -1,5 +1,27 @@
 # Public development log
 
+## 2026-11-26 — Core sampling allocations between chunks
+
+A V3.9 run on a 32 GB card stopped in the Sampler with an out-of-memory
+error that requested 7.07 GiB while CUDA reported 14.09 GiB free,
+intermittently and apparently after ComfyUI had been running for a while.
+Read Core instead of measuring, because no GPU was available: Core records a
+forward's GPU allocations in a per-thread allocation graph, H3's forward
+opens and closes that graph on every step, and the executor releases it when
+the node returns. A Core sampler node is one sampling run; a Continuum
+Sampler samples every physical group in one node, at token counts that
+differ between groups. Core's own multi-phase loops run the node-boundary
+cleanup between phases, and its writable-model path synchronizes before
+doing so. Do the same after each completed physical sample at the three
+places the package calls Core's guider, under the executor's own condition
+and through the public function only. Leave a failed sample to Core, never
+fail a sample because the cleanup failed, and add an environment opt-out so
+both behaviors can be compared on one machine. Do not add feed-forward
+chunking here: an external MODEL patch provides it and accelerators stay
+external. Cover the call and its order, every condition under which nothing
+is called, the failure path, the opt-out and the three call sites with
+recording stand-ins for Core. CPU only; see PROJECT_STATE.md.
+
 ## 2026-11-23 — Reference Images: 24 slots and Tagged chunks
 
 The nine-image ceiling was the helper's slot count, not a per-run limit: the
@@ -20,6 +42,25 @@ and storage descriptors, extended slot identity through the request, storage
 validation with R12/R24, tag scanning, the terminal union, the limit, the
 Sampler hand-off, and a three-chunk run through the V2 node with substituted
 sampling. CPU and JavaScript only; see PROJECT_STATE.md.
+
+## 2026-11-23 — Per-chunk LoRA Plan (Experimental)
+
+LoRA patches are part of the common model identity, so changing a LoRA on the
+MODEL input restarts a saved run. Record per-chunk LoRAs the way V3.9
+Reference Routing records per-chunk images: one descriptor per physical
+group, a per-chunk group hash and the group hashes in the lineage, all
+outside the common section. Write records only for groups that receive a
+LoRA, so an unconnected plan and untouched chunks keep their existing
+hashes and a plan can be attached to an existing run. Build one patched
+MODEL per distinct LoRA set and clone it per group; Core keeps the patch
+identity across clones and assigns a new one when patches are added, so this
+avoids a weight re-patch between chunks that share a set. Check the Core
+calls against current Core source. Cover the schedule, the terminal-pair
+rule, record validation, the unchanged contract without a plan, prefix
+reuse after attaching, changing and removing a plan through real Run
+Storage prepare/commit/finalize, the runtime with substituted file and
+patch functions, the public schema and a three-chunk sequence. CPU only;
+see PROJECT_STATE.md.
 
 ## 2026-11-22 — Chunks limit raised to 64
 

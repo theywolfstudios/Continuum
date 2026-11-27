@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import torch
 
+from ..core_allocations import release_sampling_allocations
 from ..state import extract_av_streams
 from .refine_sampling import (
     RefineSamplingRuntimeError,
@@ -296,6 +297,7 @@ def _sample_with_target_noise_and_mask(
         seed=int(seed),
     )
     samples = samples.to(model_management.intermediate_device())
+    release_sampling_allocations()
     if temporal_window is not None:
         sampled_output = {"samples": samples}
         sampled_video, sampled_audio = extract_av_streams(sampled_output)

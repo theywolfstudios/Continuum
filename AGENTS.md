@@ -29,7 +29,7 @@ Sampling Contract v6 and Graph Contract v4 apply to new generation. Keep origina
 - Reuse the existing pytest configuration, tests and runtime verifier. Distinguish CPU checks, offline registration, live loading, browser acceptance and GPU results.
 - Runtime checks record prompts, media, model/LoRA/sampler settings, dimensions, chunk timings and observed results. Check saved workflow metadata when available.
 - Verify all hashes declared by MANIFEST.sha256 and REGISTRY_MANIFEST.sha256 after modifying their payloads.
-- Current public registration contains twelve nodes. Do not register experimental implementations implicitly.
+- Current public registration contains thirteen nodes: the twelve V3.9 nodes and the Experimental LoRA Plan helper. Do not register experimental implementations implicitly.
 - Do not claim whole-release acceptance from a targeted repair test. Browser save/reload and the unchanged default workflow remain separate acceptance checks.
 - Keep machine-specific paths, credentials, service addresses, process identifiers and private operational records out of public documentation.
 - Record public behavior and version history in CHANGELOG.md and WORKLOG.md. PROJECT_STATE.md describes the public source status.

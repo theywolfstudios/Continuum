@@ -30,6 +30,50 @@
   with the JavaScript suites only; browser save/reload and GPU generation
   with extended slots or `Tagged chunks` have not been run.
 
+## Unreleased — Core sampling allocations released between chunks
+
+- Every sampling path of the package (the Continuum Samplers and Second
+  Pass) now returns ComfyUI Core's sampling allocations after each physical
+  sample instead of holding them until the node finishes. This targets an
+  out-of-memory stop in which a later chunk is refused one large request
+  while the device still reports free memory (reported on a 32 GB card:
+  7.07 GiB requested with 14.09 GiB free).
+- The package calls Core's own node-boundary cleanup
+  (`comfy.model_prefetch.cleanup_prefetch_queues`), and only when Core's
+  allocator is enabled. A Core without that cleanup is unaffected. Core's
+  console line `Comfy model compiler graph breaks: N, rogues: M` now appears
+  once per chunk instead of once per node.
+- Set the environment variable `H3_CONTINUUM_KEEP_CORE_ALLOCATIONS=1` before
+  starting ComfyUI to keep the previous behavior.
+- No sampling input, seed or tensor is read or changed. Sampling Contract
+  v6, Graph Contract v4, Run Storage and State/Session formats, node IDs,
+  socket/widget order and the shipped workflow files are unchanged. Package
+  version remains 3.10.3.
+- Checked on CPU only, with Core replaced by recording stand-ins. Not run
+  against ComfyUI Core or on a GPU: the reported stop has not been
+  reproduced, and whether this removes it has not been measured.
+
+## Unreleased — Per-chunk LoRA Plan (Experimental)
+
+- Add **H3 Continuum LoRA Plan (Experimental)**: one model-only LoRA, a
+  strength and a chunk selection (`all`, `off`, `1,3-5`). Chain nodes to add
+  more LoRAs. Connect it to the new optional `LoRA Plan` input of the V3.9
+  Sampler. LoRAs for every chunk stay on the MODEL input as before.
+- With saved progress, changing the plan keeps every chunk before the first
+  chunk whose LoRAs changed. Attaching a plan to an existing V3.9 run keeps
+  the chunks before its first LoRA. A LoRA is identified by file content.
+- With First and Last Image both connected, the last two chunks must use the
+  same LoRAs. A missing LoRA file stops the Sampler before sampling.
+- Without a connected plan the Sampling Contract is byte-identical to
+  before. Sampling Contract v6, Graph Contract v4, Run Storage and
+  State/Session formats, existing node IDs and socket/widget order and the
+  shipped workflow files are unchanged. Public registration is now thirteen
+  nodes. Package version remains 3.10.3.
+- Limits: model strength only; one sampler/sigma schedule for all chunks;
+  Second Pass does not read the plan; V3.9 Sampler only.
+- Checked on CPU only. Not run against ComfyUI Core, in a browser or on a
+  GPU. See docs/LORA_PLAN_CONTRACT_V1.md.
+
 ## Unreleased — Chunks limit raised to 64
 
 - The V3.8 and V3.9 Samplers accept `Chunks` from 1 to 64 (previously 16).

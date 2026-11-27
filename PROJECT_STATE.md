@@ -12,14 +12,61 @@ contracts and report text as before. Sampling v6 / Graph v4, Run Storage,
 State/Session formats, node IDs, existing socket/widget order and official
 workflow bytes are unchanged; `run_storage.py` is not modified. A run using
 slots 10–24 stores those slot IDs in its Reference contract, which earlier
-package versions reject. CPU/JavaScript without ComfyUI Core installed: 2,045
-passed, 384 skipped (Core-dependent), zero failures; the same environment gave
-2,025 passed, 384 skipped before the change. All hashes in both manifests
+package versions reject. CPU/JavaScript without ComfyUI Core installed, after
+merging the LoRA Plan and Core allocation updates: 2,102 passed, 384 skipped
+(Core-dependent), zero failures on the second of two runs. The first run had
+one failure in the existing intermittent
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache, which then
+passed five times alone. The change adds 20 tests. All hashes in both manifests
 verified. Not run: Core-dependent tests, offline registration, live loading,
 browser save/reload of the wider helper node, and any GPU generation with
 extended slots or Tagged chunks. Japanese documents are not updated. Package
 version remains 3.10.3; no Release or Registry submission accompanies this
 source update. See docs/V39_REFERENCE_INLINE.md.
+
+## Core sampling allocations between chunks — source update
+
+After each completed physical sample, the Continuum Samplers and Second Pass
+run ComfyUI Core's node-boundary allocation cleanup
+(`comfy.model_prefetch.cleanup_prefetch_queues`, after
+`comfy.model_management.synchronize`) when Core's allocator is enabled. This
+targets an out-of-memory stop in a later chunk while free device memory is
+reported. `H3_CONTINUUM_KEEP_CORE_ALLOCATIONS=1` keeps the previous
+behavior. No sampling input or tensor is read or changed; Sampling v6 /
+Graph v4, stored formats, node IDs, socket/widget order and official
+workflow bytes are unchanged. CPU/JavaScript without ComfyUI Core installed:
+2,081 passed, 384 skipped (Core-dependent) and one failure, twice in a row;
+the same environment gave 2,060 passed, 384 skipped before the change. The
+failure is the existing
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache, which is
+intermittent here on unchanged code as well: run alone, it failed 3 of 8
+times on the previous main and 3 of 8 times with this change. All hashes in
+both manifests verified. Not run: Core-dependent tests, live loading and any GPU
+generation. The cause was read from Core source; the reported stop has not
+been reproduced and the change has not been measured against it. Spectrum,
+SageAttention, Sol-Attn, KJ Preview Override and multi-GPU setups are
+untested with it. Package version remains 3.10.3; no Release or Registry
+submission accompanies this update.
+
+## Per-chunk LoRA Plan (Experimental) — source update
+
+Add the H3 Continuum LoRA Plan helper and an optional `lora_plan` input,
+appended last, on the V3.9 Sampler. The plan assigns model-only LoRAs to
+selected chunks; they are applied per physical group inside the Sampler with
+Core's model-only LoRA calls. Storage identity is per group and outside the
+common contract section (docs/LORA_PLAN_CONTRACT_V1.md): without a plan the
+Sampling Contract is byte-identical, and chunks before the first changed
+LoRA are reused. Sampling v6 / Graph v4, stored formats, existing node IDs,
+socket/widget order and official workflow bytes are unchanged. Public
+registration is thirteen nodes. CPU/JavaScript without ComfyUI Core
+installed: 2,060 passed, 384 skipped (Core-dependent). One existing test,
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache, fails
+intermittently in this environment on unchanged code as well. All hashes in
+both manifests verified. Not run: Core-dependent tests, real LoRA loading and patching,
+offline registration, live loading, browser display and save/reload, and
+any GPU generation; Spectrum, SageAttention, Sol-Attn, KJ Preview Override
+and quantised model loaders are untested with a plan. Package version
+remains 3.10.3; no Release or Registry submission accompanies this update.
 
 ## Chunks limit raised to 64 — source update
 

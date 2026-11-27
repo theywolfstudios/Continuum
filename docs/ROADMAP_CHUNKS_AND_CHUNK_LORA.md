@@ -1,6 +1,6 @@
 # Roadmap — more than 16 chunks, and per-chunk LoRAs
 
-Status: A is implemented in source with a limit of 64 (phases A0–A4; CPU and JavaScript checks only). A5 acceptance is open. B is a proposal.
+Status: A is implemented in source with a limit of 64 (phases A0–A4; CPU and JavaScript checks only). A5 acceptance is open. B is implemented in source as Experimental (CPU checks only); its GPU gate is open.
 Written against package 3.10.3 (commit `12bf61e`). Line numbers below refer to that commit.
 
 ## Summary
@@ -69,6 +69,16 @@ Requires: no contract version bump, no new node, no workflow file change.
 ---
 
 ## B. Per-chunk LoRAs
+
+### Status
+
+Implemented in source as Experimental; the contract is in `docs/LORA_PLAN_CONTRACT_V1.md`. The sections below are the original proposal. What was built differs from it in three ways:
+
+- **Sampler surface.** An optional `lora_plan` input appended to the V3.9 Sampler, not a new Sampler ID. A new ID changes the graph contract's Sampler class, so no existing V3.9 run could have adopted a plan, and the frontend keys its behaviour on the V3.8/V3.9 class names.
+- **Helper shape.** One LoRA per node, chained through `Previous LoRA Plan`, with a text chunk selection. No custom frontend table was built.
+- **Registration.** The helper is registered as the thirteenth public node, labelled Experimental, instead of staying unregistered until a GPU gate.
+
+Done: B0–B3. Open: B4 (GPU gate), B5 (table UI, Inspector and Project Manager display), B7 follow-ups. The Core API was checked against current Core source, including that a clone keeps the patch identity and adding patches assigns a new one.
 
 ### Findings
 
