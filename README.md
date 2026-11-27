@@ -591,8 +591,11 @@ Terminal-merged pairs are atomic; arbitrary frames inside a chunk cannot be edit
 ## Prompts and Reference Images
 
 - **Fixed:** one shared prompt; **List:** per-chunk prompts; **Timeline:** time-based instructions.
-- V3.9 Reference Images uses fixed **Image 1–9** slots and one Sampler connection.
-  `All chunks` shares connected images; `Per chunk` lets you tick assignments.
+- V3.9 Reference Images uses fixed **Image 1–24** slots and one Sampler connection.
+  `All chunks` shares connected images; `Per chunk` lets you tick assignments;
+  `Tagged chunks` sends an image only to chunks whose prompt has its `@R` tag.
+  One chunk can use at most nine images, so more than nine need `Per chunk` or
+  `Tagged chunks`. See [V3.9 Reference Images](docs/V39_REFERENCE_INLINE.md).
 - `@R1` always means Image 1, even if other slots are empty. Use tags only for
   active References; resolved picture numbers can differ by physical group.
 - First/Last Image, Reference Images, Reference Audio and Driving Audio have

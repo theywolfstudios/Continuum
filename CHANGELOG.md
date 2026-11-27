@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — Reference Images: 24 slots and Tagged chunks
+
+- `H3 Continuum Reference Images V3.9` has 24 fixed image slots (previously
+  nine). Slots 10–24 and their saved assignments are appended after the
+  existing inputs; `@R10`–`@R24` are their prompt tags.
+- New `Reference Use = Tagged chunks`: each image is sent only to the chunks
+  whose prompt contains its `@R` tag. An untagged image is not encoded or
+  presented. `All chunks` remains the default.
+- One chunk can use at most nine Reference Images, as before. A chunk that
+  would receive more stops the Queue before any Reference Image is encoded
+  or anything is sampled, and names the chunk; nothing is dropped
+  automatically. More than nine connected
+  images therefore need `Per chunk` or `Tagged chunks`.
+- With First + Last Image merging the final two chunks, `Tagged chunks` gives
+  the merged group the images tagged in either chunk. `Per chunk` keeps its
+  existing same-assignment rule.
+- The Reference Plan lists connected images that no chunk uses when an
+  extended slot is connected.
+- Runs that connect only slots 1–9 keep their Reference contracts, Status and
+  Reference Plan text. A run that uses slots 10–24 records those slot IDs in
+  its Reference contract; older package versions cannot read such a run.
+- Text such as `@R10` in an existing prompt was not a tag before. It is still
+  passed through unchanged when Image 10 is not connected, and now adds a
+  Reference Plan warning.
+- Sampling Contract v6, Graph Contract v4, Run Storage and State/Session
+  formats, node IDs, existing socket/widget order and the shipped workflow
+  files are unchanged. Package version remains 3.10.3. Checked on CPU and
+  with the JavaScript suites only; browser save/reload and GPU generation
+  with extended slots or `Tagged chunks` have not been run.
+
 ## Unreleased — Core sampling allocations released between chunks
 
 - Every sampling path of the package (the Continuum Samplers and Second

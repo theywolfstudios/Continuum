@@ -14,7 +14,7 @@ from typing import Any
 from ..branch_provenance import physical_groups
 from ..reference import HYBRID_PRESENTATION_VERSION, REFERENCE_PREPROCESS_VERSION
 from .reference_effective_plan import PictureMap, compile_group_picture_map
-from .reference_routing import REFERENCE_SLOT_IDS
+from .reference_routing import ALL_REFERENCE_SLOT_IDS
 
 
 REFERENCE_ROUTING_CONTRACT_VERSION = 1
@@ -73,10 +73,10 @@ def descriptor_from_facts(
         raise ReferenceStorageContractError("selected Reference slots and image hashes differ")
     if picture_map.source_slot_ids != selected_source_slot_ids:
         raise ReferenceStorageContractError("Reference Picture map differs from selected source slots")
-    if any(slot not in REFERENCE_SLOT_IDS for slot in selected_source_slot_ids):
+    if any(slot not in ALL_REFERENCE_SLOT_IDS for slot in selected_source_slot_ids):
         raise ReferenceStorageContractError("selected Reference slot is unknown")
-    if tuple(sorted(selected_source_slot_ids, key=REFERENCE_SLOT_IDS.index)) != selected_source_slot_ids:
-        raise ReferenceStorageContractError("selected Reference slots are not in fixed R1-R9 order")
+    if tuple(sorted(selected_source_slot_ids, key=ALL_REFERENCE_SLOT_IDS.index)) != selected_source_slot_ids:
+        raise ReferenceStorageContractError("selected Reference slots are not in fixed slot order")
     if len(set(selected_source_slot_ids)) != len(selected_source_slot_ids):
         raise ReferenceStorageContractError("selected Reference slot is duplicated")
     if any(not _valid_sha(value) for value in prepared_image_hashes):
@@ -195,7 +195,7 @@ def build_reference_storage_plan(
     connected = set(runtime.inputs.connected_source_slot_ids)
     selected = {slot for route in routes for slot in (route.reference_slot_ids or ()) if slot in connected}
     image_hashes: dict[str, str] = {}
-    for slot in REFERENCE_SLOT_IDS:
+    for slot in ALL_REFERENCE_SLOT_IDS:
         if slot not in selected:
             continue
         assets = runtime.inputs.prepare_selected((slot,))
@@ -290,8 +290,8 @@ def validate_reference_group_contracts(
         if not isinstance(refs, list):
             raise ReferenceStorageContractError("stored Reference group source list is invalid")
         slots = [ref.get("source_slot_id") for ref in refs if isinstance(ref, dict)]
-        if (len(slots) != len(refs) or any(slot not in REFERENCE_SLOT_IDS for slot in slots)
-                or slots != sorted(set(slots), key=REFERENCE_SLOT_IDS.index)
+        if (len(slots) != len(refs) or any(slot not in ALL_REFERENCE_SLOT_IDS for slot in slots)
+                or slots != sorted(set(slots), key=ALL_REFERENCE_SLOT_IDS.index)
                 or any(not _valid_sha(ref.get("prepared_sha256")) for ref in refs)):
             raise ReferenceStorageContractError("stored Reference group source identity is invalid")
         expected_order = (["first_frame"] if descriptor.get("first_anchor") else [])

@@ -1,5 +1,29 @@
 # Public source status
 
+## Reference Images: 24 slots and Tagged chunks — source update
+
+`H3 Continuum Reference Images V3.9` has 24 fixed slots; slots 10–24 are
+appended as optional inputs. `Reference Use = Tagged chunks` routes each image
+only to chunks whose prompt contains its `@R` tag. One chunk still accepts at
+most nine Reference Images; a chunk that would receive more stops the Queue
+before any Reference Image is encoded or anything is sampled. `All chunks` remains the default. Runs that
+connect only slots 1–9 produce the same private request, schedule, Reference
+contracts and report text as before. Sampling v6 / Graph v4, Run Storage,
+State/Session formats, node IDs, existing socket/widget order and official
+workflow bytes are unchanged; `run_storage.py` is not modified. A run using
+slots 10–24 stores those slot IDs in its Reference contract, which earlier
+package versions reject. CPU/JavaScript without ComfyUI Core installed, after
+merging the LoRA Plan and Core allocation updates: 2,102 passed, 384 skipped
+(Core-dependent), zero failures on the second of two runs. The first run had
+one failure in the existing intermittent
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache, which then
+passed five times alone. The change adds 20 tests. All hashes in both manifests
+verified. Not run: Core-dependent tests, offline registration, live loading,
+browser save/reload of the wider helper node, and any GPU generation with
+extended slots or Tagged chunks. Japanese documents are not updated. Package
+version remains 3.10.3; no Release or Registry submission accompanies this
+source update. See docs/V39_REFERENCE_INLINE.md.
+
 ## Core sampling allocations between chunks — source update
 
 After each completed physical sample, the Continuum Samplers and Second Pass

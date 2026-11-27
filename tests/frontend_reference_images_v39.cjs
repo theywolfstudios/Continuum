@@ -323,6 +323,74 @@ externalCase('adjacent non-overlapping ranges stay valid without rewriting their
     assert.match(f.text(), /Chunks 1, 2, 3/); assert(!f.checkbox(3).disabled);
     assert.equal(f.control.value, '1-2,3'); assert.equal(f.calls.native, 0);
 });
+// Extended slots (Image 10 and above), Tagged chunks and the per-chunk limit.
+function extendedFixture({ use = 'Per chunk', connected = [], saved = {}, count = 3, slots = 24 } = {}) {
+    const graph = { links: {}, nodes: new Map(), getNodeById(id) { return this.nodes.get(id); } };
+    const controls = Array.from({ length: slots }, (_, i) => ({ name: `reference_r${i + 1}_chunks`,
+        value: saved[i + 1] ?? 'off', options: {} }));
+    const mode = { name: 'reference_use', value: use, options: {} };
+    const helper = { id: 1, graph, comfyClass: 'H3ContinuumReferenceImagesV39', size: [440, 500],
+        widgets: [mode, ...controls],
+        inputs: Array.from({ length: 24 }, (_, i) => ({ name: `reference_image_${i + 1}`,
+            link: connected.includes(i + 1) ? 100 + i : null })),
+        outputs: [{ name: 'reference_images', links: [10] }],
+        addDOMWidget(_name, _type, host) { this.panel = host.children[0]; this.display = { options: {} }; return this.display; },
+        computeSize() { return [440, 310 + this.display.computeSize(440)[1]]; },
+        setSize(value) { this.size = value; }, setDirtyCanvas() {},
+    };
+    const sampler = { id: 2, graph, comfyClass: 'H3ContinuumSamplerV39',
+        widgets: [{ name: 'chunks', value: count }],
+        inputs: [{ name: 'reference_images', link: 10 }, { name: 'chunks', link: null }], setDirtyCanvas() {},
+    };
+    graph.nodes.set(1, helper); graph.nodes.set(2, sampler); graph.links[10] = { origin_id: 1, target_id: 2 };
+    configureV39ReferenceImages(helper);
+    return { helper, mode, controls,
+        text() { const values = []; const collect = (node) => { values.push(node.textContent || ''); (node.children || []).forEach(collect); }; collect(helper.panel); return values.join('\n'); },
+        checkbox(slot, n) { return visit(helper.panel, (item) => item['aria-label'] === `Image ${slot}, Chunk ${n}`); },
+    };
+}
+externalCase('X01 an extended slot gets its own row and saved assignment', () => {
+    const f = extendedFixture({ connected: [2, 12] });
+    assert(visit(f.helper.panel, (item) => item.tag === 'td' && item.textContent === 'Image 12 · @R12'));
+    const box = f.checkbox(12, 3); assert(box);
+    box.checked = true; box.onchange();
+    assert.equal(f.controls[11].value, '3'); assert.equal(f.controls[1].value, 'off');
+    assert.equal(f.controls[11].type, 'hidden');
+});
+externalCase('X02 a blank restored into an extended slot becomes off; slots 1-9 are left as saved', () => {
+    const f = extendedFixture({ connected: [1, 10], saved: { 1: '', 10: '' } });
+    assert.equal(f.controls[9].value, 'off'); assert.equal(f.controls[0].value, '');
+    assert(!f.checkbox(10, 1).disabled); assert(f.checkbox(1, 1).disabled);
+});
+externalCase('X03 Tagged chunks shows the tags and no assignment table', () => {
+    const f = extendedFixture({ use: 'Tagged chunks', connected: [1, 12], saved: { 1: '2' } });
+    assert.match(f.text(), /only to chunks whose prompt contains its tag/);
+    assert.match(f.text(), /Tags: @R1, @R12/); assert.match(f.text(), /at most 9/);
+    assert.equal(visit(f.helper.panel, (item) => item.tag === 'table'), null);
+    assert.equal(f.controls[0].value, '2', 'saved Per chunk ticks are kept');
+    f.mode.value = 'Per chunk'; f.mode.callback('Per chunk');
+    assert(f.checkbox(1, 2).checked);
+});
+externalCase('X04 All chunks warns only when more than nine images are connected', () => {
+    const nine = extendedFixture({ use: 'All chunks', connected: [1, 2, 3, 4, 5, 6, 7, 8, 9] });
+    assert.doesNotMatch(nine.text(), /at most/);
+    assert.equal(nine.helper.display.computeSize(440)[1], 62);
+    const ten = extendedFixture({ use: 'All chunks', connected: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] });
+    assert.match(ten.text(), /10 images are connected, but one chunk can use at most 9/);
+    assert.match(ten.text(), /Tagged chunks or Per chunk/);
+});
+externalCase('X05 Per chunk reports a chunk assigned more than nine images', () => {
+    const connected = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const saved = Object.fromEntries(connected.map((slot) => [slot, slot === 10 ? '1' : '1-2']));
+    const f = extendedFixture({ connected, saved });
+    assert.match(f.text(), /Over the limit of 9 images per chunk: Chunk 1 \(10\)\./);
+    const box = f.checkbox(10, 1); box.checked = false; box.onchange();
+    assert.doesNotMatch(f.text(), /Over the limit/);
+});
+externalCase('X06 a node that still has nine selector widgets keeps working', () => {
+    const f = extendedFixture({ connected: [1, 12], slots: 9 });
+    assert(f.checkbox(1, 1)); assert.equal(f.checkbox(12, 1), null);
+});
 console.log(JSON.stringify(externalCases));
 assert.equal(externalCases.filter((item) => !item.pass).length, 0, 'external Chunk assignment contracts failed');
 console.log('V3.9 Reference Images UI contract PASS');

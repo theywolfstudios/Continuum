@@ -16,6 +16,13 @@ CHUNK_SECONDS_STEP = 0.1
 # and prompt parser take the count as a parameter; this bounds schema widgets
 # and validation only. Legacy V2/V3/Easy node schemas keep their own limit.
 MAX_CHUNKS = 64
+# Fixed Reference Image identities offered by the V3.9 helper (R1..R24). R1-R9
+# are the original slots; a slot number never changes with other connections.
+MAX_REFERENCE_SLOTS = 24
+# Reference Images one chunk may receive. This is the count ComfyUI Core's own
+# MiniMax H3 Reference node accepts, and what nine connected slots always
+# produced; First/Last Image are presented in addition to it.
+MAX_REFERENCES_PER_CHUNK = 9
 CHUNK_SECONDS_TOOLTIP = (
     "Target duration shared by every chunk. 5–15 seconds is the recommended "
     "and validated range. Values above 15 seconds are supported, but VRAM "

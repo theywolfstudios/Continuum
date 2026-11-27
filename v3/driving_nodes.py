@@ -14,6 +14,7 @@ from ..constants import (
     DIAGNOSTICS_OFF,
     FPS,
     MAX_CHUNKS,
+    MAX_REFERENCE_SLOTS,
     normalize_continuity_mode,
     normalize_diagnostics_mode,
 )
@@ -834,11 +835,11 @@ class H3ContinuumSamplerV38(H3ContinuumSamplerV37):
 
 
 class H3ContinuumSamplerV39(H3ContinuumSamplerV38):
-    """Single nine-image input using the existing group-local routing engine."""
+    """Single fixed-slot image input using the existing group-local routing engine."""
 
     DESCRIPTION = (
         "H3 Continuum V3.9. Connect Reference Images V3.9 to assign fixed "
-        "images 1–9 to all chunks or selected chunks."
+        "images to all chunks, selected chunks, or the chunks that tag them."
     )
     SEARCH_ALIASES = ["H3 Continuum Sampler V3.9", "MiniMax H3 Reference Routing"]
 
@@ -875,7 +876,7 @@ class H3ContinuumSamplerV39(H3ContinuumSamplerV38):
         for name in (
             *(f"reference_image_{index}" for index in range(1, 6)),
             "image_references", "reference_routing_mode",
-            *(f"reference_r{index}_chunks" for index in range(1, 10)),
+            *(f"reference_r{index}_chunks" for index in range(1, MAX_REFERENCE_SLOTS + 1)),
         ):
             kwargs.pop(name, None)
         direct, extra, selectors = effective_reference_inputs(

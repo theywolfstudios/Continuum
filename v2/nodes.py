@@ -376,26 +376,37 @@ class H3ContinuumSamplerV2:
                 _terminal_flf_merge_enabled,
                 run_sequence_with_reference_routing,
             )
-            from ..v3.reference_routing import compile_reference_routing_schedule
+            from ..v3.reference_routing import (
+                compile_reference_routing_schedule,
+                resolve_tagged_selectors,
+            )
             from ..v3.reference_runtime import (
                 ReferenceRoutingRequest,
                 ReferenceRoutingRuntime,
             )
             if not isinstance(reference_routing_request, ReferenceRoutingRequest):
                 raise ValueError("invalid private Reference Routing request")
+            routing_terminal_merge = _terminal_flf_merge_enabled(
+                multi_chunk_flf=bool(
+                    int(chunks) >= 2 and first_frame is not None and last_frame is not None
+                ),
+                chunks=int(chunks),
+                chunk_seconds=float(chunk_seconds),
+                prompt_hashes=list(prompt_plan["hashes"]),
+                timeline_video_source=timeline_video_source,
+            )
             routing_schedule = compile_reference_routing_schedule(
                 total_chunks=int(chunks),
-                terminal_merge_enabled=_terminal_flf_merge_enabled(
-                    multi_chunk_flf=bool(
-                        int(chunks) >= 2 and first_frame is not None and last_frame is not None
-                    ),
-                    chunks=int(chunks),
-                    chunk_seconds=float(chunk_seconds),
-                    prompt_hashes=list(prompt_plan["hashes"]),
-                    timeline_video_source=timeline_video_source,
-                ),
+                terminal_merge_enabled=routing_terminal_merge,
                 mode="Custom",
-                selectors_by_slot=reference_routing_request.selectors_by_slot,
+                # "Tagged chunks" becomes an explicit chunk list from the final
+                # per-chunk prompts; other selectors pass through untouched.
+                selectors_by_slot=resolve_tagged_selectors(
+                    reference_routing_request.selectors_by_slot,
+                    prompts=list(prompt_plan["prompts"]),
+                    total_chunks=int(chunks),
+                    terminal_merge_enabled=routing_terminal_merge,
+                ),
             )
             if not routing_schedule.valid:
                 details = "; ".join(issue.message for issue in routing_schedule.issues)

@@ -224,7 +224,7 @@ def test_same_image_content_in_two_slots_retains_two_picture_identities():
         (("R1",), 2, "asset_count_mismatch"),
         (("R1", "R1"), 2, "duplicate_source_slot"),
         (("R9", "R4"), 2, "source_slot_order"),
-        (("R10",), 1, "unknown_source_slot"),
+        (("R25",), 1, "unknown_source_slot"),
     ],
 )
 def test_broken_source_metadata_is_classified_without_a_partial_plan(slots, count, expected_issue):

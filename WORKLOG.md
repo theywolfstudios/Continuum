@@ -22,6 +22,27 @@ external. Cover the call and its order, every condition under which nothing
 is called, the failure path, the opt-out and the three call sites with
 recording stand-ins for Core. CPU only; see PROJECT_STATE.md.
 
+## 2026-11-23 — Reference Images: 24 slots and Tagged chunks
+
+The nine-image ceiling was the helper's slot count, not a per-run limit: the
+V3.9 routing engine already prepares, encodes and presents only the images a
+physical group selects. Keep nine as the per-chunk limit (ComfyUI Core's own
+Reference node accepts nine) and raise the number of fixed identities to 24.
+`REFERENCE_SLOT_IDS` stays the original nine so that a Custom schedule still
+requires exactly those; R10–R24 are optional selectors that default to off
+and are left out of the private request when unconnected. Add `Tagged chunks`
+as a selector value resolved in the V2 node, where the final per-chunk
+prompts and the terminal-merge decision are known, into the same explicit
+chunk lists `Per chunk` produces. Enforce the per-chunk limit in the routing
+runtime's physical-contract check, which runs before identity encoding and
+the storage plan. Extended selector widgets are optional inputs, so API
+prompts written for nine slots still validate; a blank restored into one
+from a nine-slot workflow reads as off. Cover unchanged nine-slot requests
+and storage descriptors, extended slot identity through the request, storage
+validation with R12/R24, tag scanning, the terminal union, the limit, the
+Sampler hand-off, and a three-chunk run through the V2 node with substituted
+sampling. CPU and JavaScript only; see PROJECT_STATE.md.
+
 ## 2026-11-23 — Per-chunk LoRA Plan (Experimental)
 
 LoRA patches are part of the common model identity, so changing a LoRA on the
