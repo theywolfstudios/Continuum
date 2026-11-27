@@ -1,5 +1,26 @@
 # Public source status
 
+## Reference Images: 24 slots and Tagged chunks — source update
+
+`H3 Continuum Reference Images V3.9` has 24 fixed slots; slots 10–24 are
+appended as optional inputs. `Reference Use = Tagged chunks` routes each image
+only to chunks whose prompt contains its `@R` tag. One chunk still accepts at
+most nine Reference Images; a chunk that would receive more stops the Queue
+before any Reference Image is encoded or anything is sampled. `All chunks` remains the default. Runs that
+connect only slots 1–9 produce the same private request, schedule, Reference
+contracts and report text as before. Sampling v6 / Graph v4, Run Storage,
+State/Session formats, node IDs, existing socket/widget order and official
+workflow bytes are unchanged; `run_storage.py` is not modified. A run using
+slots 10–24 stores those slot IDs in its Reference contract, which earlier
+package versions reject. CPU/JavaScript without ComfyUI Core installed: 2,045
+passed, 384 skipped (Core-dependent), zero failures; the same environment gave
+2,025 passed, 384 skipped before the change. All hashes in both manifests
+verified. Not run: Core-dependent tests, offline registration, live loading,
+browser save/reload of the wider helper node, and any GPU generation with
+extended slots or Tagged chunks. Japanese documents are not updated. Package
+version remains 3.10.3; no Release or Registry submission accompanies this
+source update. See docs/V39_REFERENCE_INLINE.md.
+
 ## Chunks limit raised to 64 — source update
 
 The V3.8 and V3.9 Samplers accept 1–64 Chunks; Regenerate From, Take selection,

@@ -207,7 +207,7 @@ def test_custom_missing_selectors_unknown_slots_and_invalid_modes_are_classified
         total_chunks=2,
         terminal_merge_enabled=False,
         mode="Custom",
-        selectors_by_slot=_selectors(R9="off", R10="all"),
+        selectors_by_slot=_selectors(R9="off", R25="all"),
     )
     invalid_mode = compile_reference_routing_schedule(
         total_chunks=2,

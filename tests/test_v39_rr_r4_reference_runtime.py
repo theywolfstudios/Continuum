@@ -225,9 +225,9 @@ def test_reference_rewrite_is_exact_and_never_rewrites_subject_or_partial_tokens
         has_last_image=True,
     )
     effective, warnings = rewrite_reference_tags(
-        "@R4 <Subject 4> @R5 @R10 X@R4 @R4suffix", picture_map
+        "@R4 <Subject 4> @R5 @R40 @R100 X@R4 @R4suffix", picture_map
     )
-    assert effective == "<Picture 3> <Subject 4> @R5 @R10 X@R4 @R4suffix"
+    assert effective == "<Picture 3> <Subject 4> @R5 @R40 @R100 X@R4 @R4suffix"
     assert len(warnings) == 1 and "R5" in warnings[0]
 
 

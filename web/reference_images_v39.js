@@ -2,6 +2,12 @@ const CLASS = "H3ContinuumReferenceImagesV39";
 const SAMPLER = "H3ContinuumSamplerV39";
 // Keep equal to MAX_CHUNKS in constants.py.
 const MAX = 64;
+// Keep equal to MAX_REFERENCE_SLOTS and MAX_REFERENCES_PER_CHUNK in constants.py.
+const SLOTS = 24;
+const PER_CHUNK_LIMIT = 9;
+// Images 1-9 are the original slots; later ones are optional on older nodes.
+const BASE_SLOTS = 9;
+const TAGGED = "Tagged chunks";
 const LEGACY_SAMPLER_INPUTS = new Set([
     ...Array.from({ length: 5 }, (_, index) => `reference_image_${index + 1}`),
     "image_references",
@@ -87,12 +93,13 @@ export function pruneV39LegacyReferenceInputs(node) {
 export function configureV39ReferenceImages(node) {
     if (node?.comfyClass !== CLASS || typeof document === "undefined") return;
     const mode = getWidget(node, "reference_use");
-    const selectors = Array.from({ length: 9 }, (_, i) => getWidget(node, `reference_r${i + 1}_chunks`));
-    if (!mode || selectors.some((item) => !item)) return;
+    const selectors = Array.from({ length: SLOTS }, (_, i) => getWidget(node, `reference_r${i + 1}_chunks`));
+    if (!mode || selectors.slice(0, BASE_SLOTS).some((item) => !item)) return;
+    const controls = selectors.filter(Boolean);
     if (node.__h3ReferenceImagesRefresh) return node.__h3ReferenceImagesRefresh();
     if (typeof node.addDOMWidget !== "function") return;
     // The standard STRING widgets remain serializable; only their presentation is hidden.
-    for (const item of selectors) {
+    for (const item of controls) {
         item.type = "hidden";
         item.hidden = true;
         item.options ||= {};
@@ -132,15 +139,34 @@ export function configureV39ReferenceImages(node) {
         target.callback?.(target.value);
     };
     const refresh = () => {
+        // A workflow saved with nine slots can restore a blank into a newer one.
+        for (const item of selectors.slice(BASE_SLOTS)) {
+            if (item && !String(item.value ?? "").trim()) item.value = "off";
+        }
         const { count, known, reason } = destination(node);
-        const rows = Array.from({ length: 9 }, (_, i) => i + 1).filter((slot) =>
+        const connected = Array.from({ length: SLOTS }, (_, i) => i + 1).filter((slot) =>
             node.inputs?.some((input) => input.name === `reference_image_${slot}` && input.link != null));
-        const key = JSON.stringify([mode.value, count, known, reason, rows, selectors.map((item) => item.value), page]);
+        const rows = connected.filter((slot) => selectors[slot - 1]);
+        const key = JSON.stringify([mode.value, count, known, reason, connected, controls.map((item) => item.value), page]);
         if (key === previousKey) return;
         previousKey = key;
         panel.replaceChildren();
+        if (mode.value === TAGGED) {
+            panel.append(element("div", "Each image is sent only to chunks whose prompt contains its tag."));
+            panel.append(element("div", connected.length
+                ? `Tags: ${connected.map((slot) => `@R${slot}`).join(", ")}`
+                : "Connect Reference Images, then tag them in the prompt (Image 1 is @R1)."));
+            panel.append(element("div", `An untagged image is not used. One chunk can use at most ${PER_CHUNK_LIMIT}.`));
+            reservePanelSpace(connected.length > 12 ? 104 : 88);
+            return;
+        }
         if (mode.value !== "Per chunk") {
             panel.append(element("div", "Connected images are used in all chunks."));
+            if (connected.length > PER_CHUNK_LIMIT) {
+                panel.append(element("div", `${connected.length} images are connected, but one chunk can use at most ${PER_CHUNK_LIMIT}. Choose Tagged chunks or Per chunk.`));
+                reservePanelSpace(104);
+                return;
+            }
             reservePanelSpace(54);
             return;
         }
@@ -242,7 +268,15 @@ export function configureV39ReferenceImages(node) {
         })) {
             panel.append(element("div", known ? "No references assigned. Check the chunks to use." : "No saved assignments. Check the chunks to use."));
         }
-        reservePanelSpace(Math.min(360, 77 + rows.length * 36 + (count > 6 ? 32 : 0) + (known ? 0 : 40)));
+        const crowded = [];
+        for (let n = 1; n <= count; n += 1) {
+            const used = rows.filter((slot) => selections.get(slot).chunks?.has(n)).length;
+            if (used > PER_CHUNK_LIMIT) crowded.push(`${n} (${used})`);
+        }
+        if (crowded.length) {
+            panel.append(element("div", `Over the limit of ${PER_CHUNK_LIMIT} images per chunk: Chunk ${crowded.join(", ")}. Untick some before Queue.`));
+        }
+        reservePanelSpace(Math.min(360, 77 + rows.length * 36 + (count > 6 ? 32 : 0) + (known ? 0 : 40) + (crowded.length ? 34 : 0)));
         node.setDirtyCanvas?.(true, true);
     };
     node.__h3ReferenceImagesRefresh = refresh;
@@ -253,7 +287,7 @@ export function configureV39ReferenceImages(node) {
         refresh();
         return result;
     };
-    for (const control of [mode, ...selectors]) {
+    for (const control of [mode, ...controls]) {
         const previous = control.callback;
         control.callback = function(...args) {
             const result = previous?.apply(this, args);

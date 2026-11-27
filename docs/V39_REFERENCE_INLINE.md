@@ -2,12 +2,28 @@
 
 V3.9 has a new Reference Images input. The V3.8 sampler and the V38X2 workflow are retained. Start with `examples/workflows/MiniMax_H3_Continuum_V39.json` as a separate workflow; the earlier `MiniMax_H3_Continuum_V39_Reference_Inline.json` remains a migration fixture. The unchanged default official workflow has not passed a real browser save/reload or GPU acceptance gate yet. Its image loaders 1–6 are wired but bypassed, slots 7–9 need user-added loaders, and Sequence Prompt is blank for the user to fill. The user-selected JSON is used without edits. Its saved size controls are First Image + Draft 0.30 MP and the First Image loader is enabled: select your own First Image file before Queue. For Reference-only, turn that loader off and choose Manual. Saved 480×640 applies only to Manual mode. The standard V38X2 ZIP contains both V38X2 and V3.9 JSONs; the two Templates remain separate.
 
-1. Connect images to `H3 Continuum Reference Images V3.9`, slots `Reference Image 1` through `Reference Image 9`. Each number is fixed; an empty slot never shifts the later numbers.
+1. Connect images to `H3 Continuum Reference Images V3.9`, slots `Reference Image 1` through `Reference Image 24`. Each number is fixed; an empty slot never shifts the later numbers. Slots 10–24 are extended slots (see below); leaving them empty changes nothing.
 2. Connect its one `reference_images` output to the V3.9 Sampler's `Reference Images (Optional)` input. The official V3.9 workflow has this wiring already.
-3. Choose `Reference Use = All chunks` to use connected images in every chunk. For different images in each chunk, select `Per chunk` and tick the table inside the helper node. Switching to Per chunk for the first time starts with no ticks. The helper keeps its ticks if you return to All and then select Per chunk again.
+3. Choose `Reference Use = All chunks` to use connected images in every chunk. For different images in each chunk, select `Per chunk` and tick the table inside the helper node, or select `Tagged chunks` to let the prompt decide (see below). Switching to Per chunk for the first time starts with no ticks. The helper keeps its ticks if you return to All and then select Per chunk again.
 4. The Sampler owns the chunk count. For six chunks you may tick Image 1 at chunks 1, 3 and 6. If you temporarily reduce Chunks to three, the saved tick at six remains and becomes active again when Chunks returns to six. New chunks are unticked in Per chunk mode.
 5. In `Sequence Prompt`, use `@R1` for fixed Image 1, `@R4` for fixed Image 4, and so on. The actual `<Picture N>` may change by chunk and with First/Last Image connections. Inactive `@R` tags produce warnings; they do not block generation. An image can condition a chunk even without an explicit tag. Not assigning an image in a later chunk does not guarantee the subject disappears from continued video.
 6. If an existing First/Last setup merges the final two logical chunks into one physical group, those two chunks must have the same effective reference set. The runtime reports a conflict before sampling if they differ. It never merges or changes the assignments automatically.
+
+## More than nine images: extended slots and `Tagged chunks`
+
+One chunk can use at most **nine** Reference Images. That is the number ComfyUI Core's own MiniMax H3 Reference node accepts, and First/Last Image are presented in addition to it (up to eleven Pictures in a chunk). The limit is per chunk, not per run: the helper has 24 fixed slots, and a run can use all of them as long as no single chunk receives more than nine.
+
+- `Tagged chunks` sends an image only to the chunks whose prompt contains its tag. If chunk 1 says `@R1 greets @R12` and chunk 3 says `@R12 walks away`, chunk 1 receives Images 1 and 12, chunk 3 receives Image 12, and chunk 2 receives none. Tags in text shared by every chunk count for every chunk. A connected image that no prompt tags is not encoded or presented at all; the Reference Plan lists it under `Not used by any chunk`.
+- `Per chunk` works for slots 10–24 as it does for 1–9. The table reports any chunk ticked for more than nine images.
+- `All chunks` is only possible with nine or fewer connected images.
+- If a chunk would receive more than nine images, Queue stops before any Reference Image is encoded or anything is sampled, and names the chunk and its images. Nothing is dropped or reordered automatically.
+- When First + Last Image merge the final two chunks into one physical group, `Tagged chunks` gives that group the images tagged in either chunk, because the group is sampled once from both prompts. `Per chunk` keeps the existing rule in step 6.
+- `@R10`–`@R24` are now tags. They were plain text before; in a prompt that already contained such text, an unconnected `@R10` stays unchanged and adds one warning to the Reference Plan.
+- Switching between `Per chunk` and `Tagged chunks` keeps the saved ticks. Changing which images a chunk receives regenerates that chunk and the ones after it, as any other Reference change does; earlier chunks are reused.
+
+Runs that connect only slots 1–9 in `All chunks` or `Per chunk` keep their existing Reference contracts and can still reuse saved chunks. A run that uses an extended slot stores `R10`–`R24` in its Reference contract, which an older package version cannot read.
+
+Extended slots and `Tagged chunks` are covered by CPU and JavaScript tests only. They have not been run in a browser or on a GPU, and no claim is made about identity quality, VRAM or speed with more than nine connected images.
 
 The helper table displays configured intent. The Sampler's Reference Plan reports observed group mappings and hashes after Queue. A saved workflow retains input connections and selection widgets, not a previous Queue's verified report. Use a new Run Name when switching from V3.8 or from an older V3.9 prototype. Previously accepted V3.8 Takes do not migrate automatically.
 

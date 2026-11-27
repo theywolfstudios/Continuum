@@ -9,10 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .reference_routing import REFERENCE_SLOT_IDS, ReferenceRoutingSchedule
+from .reference_routing import REFERENCE_SLOT_ORDER, ReferenceRoutingSchedule
 
 
-_SLOT_ORDER = {slot_id: index for index, slot_id in enumerate(REFERENCE_SLOT_IDS)}
+_SLOT_ORDER = REFERENCE_SLOT_ORDER
 
 
 @dataclass(frozen=True, slots=True)

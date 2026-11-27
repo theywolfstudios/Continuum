@@ -47,11 +47,21 @@ def resolve_reference_image_inputs(
     reference_image_4=None,
     reference_image_5=None,
     image_references=None,
+    *,
+    allow_extended: bool = False,
 ) -> tuple[torch.Tensor | None, ...]:
     extra = [None] * 6
     if image_references is not None:
-        if not isinstance(image_references, ReferenceImageBundle) or len(image_references.images) != 6:
-            raise ReferenceConditioningError("expected a Reference Images bundle for slots 4–9")
+        count = (
+            len(image_references.images)
+            if isinstance(image_references, ReferenceImageBundle) else -1
+        )
+        if count != 6:
+            # Only the routed V3.9 path, which selects images per chunk, may
+            # carry the extended fixed slots after R9.
+            from .constants import MAX_REFERENCE_SLOTS
+            if not (allow_extended and 6 < count <= MAX_REFERENCE_SLOTS - 3):
+                raise ReferenceConditioningError("expected a Reference Images bundle for slots 4–9")
         extra = list(image_references.images)
     for index, legacy in enumerate((reference_image_4, reference_image_5)):
         if legacy is not None:
@@ -216,6 +226,7 @@ def prepare_reference_assets(
     resolved_inputs = resolve_reference_image_inputs(
         reference_image_1, reference_image_2, reference_image_3,
         reference_image_4, reference_image_5, image_references,
+        allow_extended=selected_source_slot_ids is not None,
     )
     selected_slots = (
         None if selected_source_slot_ids is None else set(selected_source_slot_ids)

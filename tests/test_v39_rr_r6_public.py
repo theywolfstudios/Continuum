@@ -13,6 +13,7 @@ import pytest
 import torch
 
 from ComfyUI_H3_Continuum_Join import nodes as public_nodes
+from ComfyUI_H3_Continuum_Join.constants import MAX_REFERENCE_SLOTS
 from ComfyUI_H3_Continuum_Join.v3 import driving_nodes
 from ComfyUI_H3_Continuum_Join.v3.reference_images_v39 import (
     H3ContinuumReferenceImagesV39,
@@ -57,8 +58,14 @@ def test_v39_has_one_typed_reference_input_and_v38_is_unchanged():
                                    | {"reference_images"})
     assert new["optional"]["reference_images"][0] == H3ContinuumReferenceImagesV39.RETURN_TYPES[0]
     assert public_nodes.NODE_CLASS_MAPPINGS["H3ContinuumReferenceImagesV39"] is H3ContinuumReferenceImagesV39
-    assert tuple(H3ContinuumReferenceImagesV39.INPUT_TYPES()["optional"]) == tuple(
-        f"reference_image_{index}" for index in range(1, 10)
+    helper = H3ContinuumReferenceImagesV39.INPUT_TYPES()
+    # The original nine come first and in order; extended slots are appended.
+    assert tuple(helper["required"]) == (
+        "reference_use", *(f"reference_r{index}_chunks" for index in range(1, 10)),
+    )
+    assert tuple(helper["optional"]) == (
+        *(f"reference_image_{index}" for index in range(1, MAX_REFERENCE_SLOTS + 1)),
+        *(f"reference_r{index}_chunks" for index in range(10, MAX_REFERENCE_SLOTS + 1)),
     )
 
 

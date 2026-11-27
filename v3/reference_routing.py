@@ -12,9 +12,23 @@ import re
 from typing import Any
 
 from ..branch_provenance import BranchProvenanceError, physical_groups
+from ..constants import MAX_REFERENCE_SLOTS, MAX_REFERENCES_PER_CHUNK
 
 
+# R1-R9 are the original fixed slots. A Custom schedule must state each of
+# them, and legacy "All" means exactly these nine.
 REFERENCE_SLOT_IDS = tuple(f"R{index}" for index in range(1, 10))
+# Every fixed identity. Extended slots (R10 and above) are optional in a
+# schedule: an absent selector is "off", so a run that does not use them
+# compiles exactly as it did when only nine slots existed.
+ALL_REFERENCE_SLOT_IDS = tuple(f"R{index}" for index in range(1, MAX_REFERENCE_SLOTS + 1))
+EXTENDED_REFERENCE_SLOT_IDS = ALL_REFERENCE_SLOT_IDS[len(REFERENCE_SLOT_IDS):]
+REFERENCE_SLOT_ORDER = {slot_id: index for index, slot_id in enumerate(ALL_REFERENCE_SLOT_IDS)}
+# Private selector value: "the chunks whose prompt names this slot's @R tag".
+# It is resolved to an explicit chunk list before a schedule is compiled.
+TAGGED_SELECTOR = "tagged"
+
+REFERENCE_TAG = re.compile(r"(?<![A-Za-z0-9_])@R([1-9][0-9]?)(?![A-Za-z0-9_])")
 
 _INTEGER_TOKEN = re.compile(r"^[0-9]+$")
 _RANGE_TOKEN = re.compile(r"^([0-9]+)\s*-\s*([0-9]+)$")
@@ -182,6 +196,86 @@ def parse_chunk_selector(selector: Any, *, total_chunks: int) -> ChunkSelectorRe
     return ChunkSelectorResult("chunks", tuple(sorted(selected)))
 
 
+def tagged_reference_slot_ids(prompt: Any) -> tuple[str, ...]:
+    """Fixed slots named by @R tags in one prompt, in fixed slot order."""
+
+    found = {f"R{number}" for number in REFERENCE_TAG.findall(str(prompt))}
+    return tuple(slot_id for slot_id in ALL_REFERENCE_SLOT_IDS if slot_id in found)
+
+
+def resolve_tagged_selectors(
+    selectors_by_slot: Any,
+    *,
+    prompts: Any,
+    total_chunks: int,
+    terminal_merge_enabled: bool,
+) -> Any:
+    """Replace each ``tagged`` selector with the chunks that name its @R tag.
+
+    A terminal atomic physical group is sampled once from a prompt holding
+    both members' text, so both members receive the union of their tags. The
+    mapping is returned unchanged when no slot is tagged.
+    """
+
+    if not isinstance(selectors_by_slot, Mapping):
+        return selectors_by_slot
+    tagged = [
+        slot_id for slot_id, selector in selectors_by_slot.items()
+        if isinstance(selector, str) and selector.strip().casefold() == TAGGED_SELECTOR
+    ]
+    if not tagged:
+        return selectors_by_slot
+    if isinstance(total_chunks, bool) or not isinstance(total_chunks, int) or total_chunks < 1:
+        raise ValueError("total_chunks must be a positive integer")
+    prompt_list = list(prompts) if isinstance(prompts, (list, tuple)) else None
+    if prompt_list is None or len(prompt_list) != total_chunks:
+        raise ValueError("Tagged Reference routing needs one prompt per chunk")
+    try:
+        groups = physical_groups(
+            chunks=total_chunks, terminal_merge_enabled=terminal_merge_enabled,
+        )
+    except BranchProvenanceError as exc:
+        raise ValueError(str(exc)) from exc
+    chunks_by_slot: dict[str, list[int]] = {slot_id: [] for slot_id in tagged}
+    for group in groups:
+        members = range(group.start, group.end + 1)
+        named: set[str] = set()
+        for chunk in members:
+            named.update(tagged_reference_slot_ids(prompt_list[chunk - 1]))
+        for slot_id in tagged:
+            if slot_id in named:
+                chunks_by_slot[slot_id].extend(members)
+    resolved = dict(selectors_by_slot)
+    for slot_id in tagged:
+        resolved[slot_id] = ",".join(map(str, chunks_by_slot[slot_id])) or "off"
+    return resolved
+
+
+def reference_limit_issues(
+    schedule: "ReferenceRoutingSchedule", connected_slot_ids: Any,
+) -> tuple[RoutingIssue, ...]:
+    """Physical groups whose connected selection exceeds the per-chunk limit."""
+
+    connected = set(connected_slot_ids)
+    issues: list[RoutingIssue] = []
+    for route in schedule.physical_routes:
+        active = tuple(
+            slot_id for slot_id in (route.reference_slot_ids or ()) if slot_id in connected
+        )
+        if len(active) <= MAX_REFERENCES_PER_CHUNK:
+            continue
+        label = (
+            f"Chunk {route.logical_chunks[0]}" if len(route.logical_chunks) == 1 else
+            "Chunks " + "-".join(str(route.logical_chunks[index]) for index in (0, -1))
+        )
+        issues.append(RoutingIssue(
+            "too_many_references",
+            f"{label} would receive {len(active)} Reference Images ({', '.join(active)}); "
+            f"one chunk accepts at most {MAX_REFERENCES_PER_CHUNK}",
+        ))
+    return tuple(issues)
+
+
 def _invalid_schedule(
     *,
     mode: str,
@@ -210,7 +304,8 @@ def compile_reference_routing_schedule(
 
     An absent mode preserves legacy All behavior. Custom mode requires an
     explicit selector for each fixed R1-R9 slot; explicit all-off is valid and
-    remains distinct from an absent mode. Terminal atomic groups with
+    remains distinct from an absent mode. Extended slots (R10 and above) are
+    optional and default to off. Terminal atomic groups with
     different member routes are surfaced as conflicts without auto-correction.
     """
 
@@ -257,7 +352,7 @@ def compile_reference_routing_schedule(
             )
         else:
             for slot_id in selectors_by_slot:
-                if slot_id not in REFERENCE_SLOT_IDS:
+                if slot_id not in REFERENCE_SLOT_ORDER:
                     issues.append(
                         RoutingIssue(
                             "unknown_reference_slot",
@@ -265,8 +360,10 @@ def compile_reference_routing_schedule(
                             slot_id=str(slot_id),
                         )
                     )
-            for slot_id in REFERENCE_SLOT_IDS:
+            for slot_id in ALL_REFERENCE_SLOT_IDS:
                 if slot_id not in selectors_by_slot:
+                    if slot_id in EXTENDED_REFERENCE_SLOT_IDS:
+                        continue
                     issues.append(
                         RoutingIssue(
                             "missing_selector",
@@ -307,8 +404,9 @@ def compile_reference_routing_schedule(
         else:
             selected_slots = tuple(
                 slot_id
-                for slot_id in REFERENCE_SLOT_IDS
-                if logical_chunk in slot_selectors[slot_id].logical_chunks
+                for slot_id in ALL_REFERENCE_SLOT_IDS
+                if slot_id in slot_selectors
+                and logical_chunk in slot_selectors[slot_id].logical_chunks
             )
         logical_routes.append(
             LogicalReferenceRoute(logical_chunk, tuple(selected_slots))

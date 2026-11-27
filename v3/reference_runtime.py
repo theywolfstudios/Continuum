@@ -27,10 +27,16 @@ from ..reference import (
 )
 from ..v2.h3_builder import encode_prompt_conditioning, encode_prompt_conditioning_cached
 from .reference_effective_plan import PictureMap, compile_group_picture_map
-from .reference_routing import REFERENCE_SLOT_IDS, ReferenceRoutingSchedule
+from .reference_routing import (
+    ALL_REFERENCE_SLOT_IDS,
+    REFERENCE_SLOT_IDS,
+    REFERENCE_TAG,
+    ReferenceRoutingSchedule,
+    reference_limit_issues,
+)
 
 
-_REFERENCE_TAG = re.compile(r"(?<![A-Za-z0-9_])@R([1-9])(?![A-Za-z0-9_])")
+_REFERENCE_TAG = REFERENCE_TAG
 
 
 class ReferenceRuntimeContractError(ValueError):
@@ -48,7 +54,10 @@ class ReferenceRoutingRequest:
 
 @dataclass(frozen=True, slots=True)
 class ReferenceInputSet:
-    """Raw R1-R9 sockets; no image is validated, resized, or VAE-encoded here."""
+    """Raw fixed-slot sockets; no image is validated, resized, or VAE-encoded here.
+
+    Nine entries are R1-R9. A longer tuple also carries extended slots.
+    """
 
     images: tuple[torch.Tensor | None, ...]
     output_width: int
@@ -72,13 +81,14 @@ class ReferenceInputSet:
         images = resolve_reference_image_inputs(
             reference_image_1, reference_image_2, reference_image_3,
             reference_image_4, reference_image_5, image_references,
+            allow_extended=True,
         )
         return cls(images, int(output_width), int(output_height), str(size_mode))
 
     @property
     def connected_source_slot_ids(self) -> tuple[str, ...]:
         return tuple(
-            slot_id for slot_id, image in zip(REFERENCE_SLOT_IDS, self.images, strict=True)
+            slot_id for slot_id, image in zip(ALL_REFERENCE_SLOT_IDS, self.images)
             if image is not None
         )
 
@@ -124,7 +134,7 @@ def rewrite_reference_tags(prompt: str, picture_map: PictureMap) -> tuple[str, t
     effective = _REFERENCE_TAG.sub(replace_tag, str(prompt))
     warnings = tuple(
         f"{slot_id} is not active in this physical group; {slot_id}'s @R tag was left unchanged"
-        for slot_id in REFERENCE_SLOT_IDS if slot_id in inactive
+        for slot_id in ALL_REFERENCE_SLOT_IDS if slot_id in inactive
     )
     return effective, warnings
 
@@ -152,8 +162,9 @@ class ReferenceRoutingRuntime:
     def __init__(self, *, schedule: ReferenceRoutingSchedule, inputs: ReferenceInputSet):
         if not isinstance(schedule, ReferenceRoutingSchedule) or not schedule.valid:
             raise ReferenceRuntimeContractError("RR-R4 requires a valid RR-R2 routing schedule")
-        if not isinstance(inputs, ReferenceInputSet) or len(inputs.images) != len(REFERENCE_SLOT_IDS):
-            raise ReferenceRuntimeContractError("RR-R4 requires nine fixed raw Reference slots")
+        if (not isinstance(inputs, ReferenceInputSet)
+                or not len(REFERENCE_SLOT_IDS) <= len(inputs.images) <= len(ALL_REFERENCE_SLOT_IDS)):
+            raise ReferenceRuntimeContractError("RR-R4 requires the fixed raw Reference slots")
         self.schedule = schedule
         self.inputs = inputs
         # RR-R4 has no saved-run/prefix contract. Keep its session identity
@@ -184,6 +195,14 @@ class ReferenceRoutingRuntime:
         if any(route.status == "conflict" for route in self.schedule.physical_routes):
             raise ReferenceRuntimeContractError(
                 "RR-R4 cannot select one Reference set for a conflicting terminal physical group"
+            )
+        over_limit = reference_limit_issues(self.schedule, self.inputs.connected_source_slot_ids)
+        if over_limit:
+            raise ReferenceRuntimeContractError(
+                "; ".join(issue.message for issue in over_limit)
+                + ". In Reference Images V3.9, use Tagged chunks or Per chunk so that "
+                "every chunk stays within the limit. No Reference Image was encoded "
+                "and nothing was sampled."
             )
 
     @property
