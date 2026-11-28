@@ -196,8 +196,12 @@ def _apply_review_decode_scope(
     selected_entries = entries[start - 1 : end]
     sequence_complete = len(entries) == int(configured_chunks)
     from ..v2.sequence import _terminal_flf_merge_enabled
+    from .chunk_timings import active_chunk_durations
     from .plan import prepare_physical_decode_entries
 
+    chunk_durations = active_chunk_durations(
+        chunks=int(configured_chunks), chunk_seconds=float(chunk_seconds),
+    )
     terminal_merged = sequence_complete and _terminal_flf_merge_enabled(
         multi_chunk_flf=(
             first_frame is not None
@@ -208,6 +212,7 @@ def _apply_review_decode_scope(
         chunk_seconds=float(chunk_seconds),
         prompt_hashes=[str(entry["prompt_hash"]) for entry in entries],
         timeline_video_source=timeline_video_source,
+        chunk_durations=chunk_durations,
     )
     selected_terminal_merged = terminal_merged and (
         end == int(configured_chunks)
@@ -223,6 +228,10 @@ def _apply_review_decode_scope(
         ),
         terminal_merged=selected_terminal_merged,
         terminal_initial_pair=(start == 1),
+        chunk_durations=(
+            None if chunk_durations is None
+            else chunk_durations[start - 1 : start - 1 + len(selected_entries)]
+        ),
     )
     scoped_plan[REVIEW_AUDIO_PROJECTION_KEY] = audio_projection
     # Projection narrows the AV decode view, not the already-verified routing
@@ -639,11 +648,15 @@ class H3ContinuumSamplerV3:
             entries, last_state, session, report = sequence_outputs
 
         from ..v2.sequence import _terminal_flf_merge_enabled
+        from .chunk_timings import active_chunk_durations
         from .plan import prepare_physical_decode_entries
 
         configured_chunks = int(chunks)
         completed_chunks = len(entries)
         sequence_complete = completed_chunks == configured_chunks
+        chunk_durations = active_chunk_durations(
+            chunks=configured_chunks, chunk_seconds=float(chunk_seconds),
+        )
         terminal_merged = sequence_complete and _terminal_flf_merge_enabled(
             multi_chunk_flf=(
                 first_frame is not None
@@ -654,6 +667,7 @@ class H3ContinuumSamplerV3:
             chunk_seconds=float(chunk_seconds),
             prompt_hashes=[str(entry["prompt_hash"]) for entry in entries],
             timeline_video_source=timeline_video_source,
+            chunk_durations=chunk_durations,
         )
         decode_entries, assembly_plan = prepare_physical_decode_entries(
             entries,
@@ -662,6 +676,9 @@ class H3ContinuumSamplerV3:
                 sequence_complete and advanced_values["last_frame"] is not None
             ),
             terminal_merged=terminal_merged,
+            chunk_durations=(
+                None if chunk_durations is None else chunk_durations[: len(entries)]
+            ),
         )
         if reference_routing_request is not None:
             from .reference_plan_inspector import project_reference_plan

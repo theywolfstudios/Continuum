@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — Per-chunk lengths: Chunk Timings (Experimental)
+
+- Add **H3 Continuum Chunk Timings (Experimental)**: one text field that
+  gives selected chunks their own length, as a list in chunk order
+  (`5, 8, 6.5`) or one line per change (`2: 8`, `4-6: 10`). Connect it to the
+  new optional `Chunk Timings` input of the V3.9 Sampler, appended after
+  `LoRA Plan`. Chunks not listed keep `Seconds per Chunk`; each value is
+  4–30 s.
+- Each chunk aims at its cumulative target, so a chunk lands within one H3
+  frame-grid step of its length and the next chunk absorbs the difference,
+  as with uniform chunks. Finalize trims or pads to the exact total. The
+  Status lists every chunk's length and the total.
+- Timeline prompt sections follow the new chunk boundaries, and Driving
+  Audio covers the new total. With First and Last Image, the last two chunks
+  are only merged when both are 5 s. The legacy Timeline Video (VIDEO) input
+  is refused with an override; Timeline Video Frames with Follow Timeline
+  works.
+- With saved progress, changing chunk N's length keeps chunks 1 … N−1.
+  `Seconds per Chunk` stays in the common contract, so changing it still
+  starts from chunk 1.
+- Without an override (input disconnected, empty, or only repeating
+  `Seconds per Chunk`) the Sampling Contract, Session and assembly plan are
+  byte-identical to before. Sampling Contract v6, Graph Contract v4, Run
+  Storage and State/Session formats, existing node IDs and socket/widget
+  order and the shipped workflow files are unchanged. Public registration is
+  now fourteen nodes. Package version remains 3.10.3.
+- Checked on CPU and in the JavaScript suites only. Not run against ComfyUI
+  Core, in a browser or on a GPU. See docs/CHUNK_TIMINGS_CONTRACT_V1.md.
+
 ## Unreleased — Reference Images: 24 slots and Tagged chunks
 
 - `H3 Continuum Reference Images V3.9` has 24 fixed image slots (previously

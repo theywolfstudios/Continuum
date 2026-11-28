@@ -29,6 +29,7 @@ PUBLIC_DISPLAY_NAMES = {
     "H3ContinuumReferenceImagesV39": "H3 Continuum Reference Images V3.9",
     "H3DecodeCacheHelper": "Decode Cache Helper",
     "H3ContinuumLoraPlan": "H3 Continuum LoRA Plan (Experimental)",
+    "H3ContinuumChunkTimings": "H3 Continuum Chunk Timings (Experimental)",
 }
 
 

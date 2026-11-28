@@ -236,6 +236,15 @@ class H3ContinuumSamplerV34(H3ContinuumSamplerProduction):
         target_frames = round(
             int(kwargs["chunks"]) * float(kwargs["chunk_seconds"]) * FPS
         )
+        from .chunk_timings import active_chunk_durations, frames_through
+        chunk_durations = active_chunk_durations(
+            chunks=int(kwargs["chunks"]), chunk_seconds=float(kwargs["chunk_seconds"]),
+        )
+        if chunk_durations is not None:
+            target_frames = frames_through(
+                int(kwargs["chunks"]), chunk_seconds=float(kwargs["chunk_seconds"]),
+                durations=chunk_durations,
+            )
         source = prepare_driving_audio_source(
             driving_audio,
             audio_vae,
@@ -867,10 +876,19 @@ class H3ContinuumSamplerV39(H3ContinuumSamplerV38):
              "tooltip": "Connect H3 Continuum LoRA Plan to apply model-only LoRAs to selected chunks. "
                         "LoRAs for every chunk can stay on the MODEL input."},
         )
+        # Appended after lora_plan for the same reason. Disconnected, or a
+        # bundle that changes no chunk, runs exactly as without this input.
+        from .chunk_timings import CHUNK_TIMINGS_TYPE
+        optional["chunk_timings"] = (
+            CHUNK_TIMINGS_TYPE,
+            {"display_name": "Chunk Timings (Optional, Experimental)",
+             "tooltip": "Connect H3 Continuum Chunk Timings to give selected chunks their own "
+                        "length. Other chunks keep Chunk Seconds."},
+        )
         schema["optional"] = optional
         return schema
 
-    def run(self, reference_images=None, lora_plan=None, **kwargs):
+    def run(self, reference_images=None, lora_plan=None, chunk_timings=None, **kwargs):
         # The public V3.9 schema owns a single Reference input. Stale API
         # keys must not create a second route around that input.
         for name in (
@@ -885,8 +903,9 @@ class H3ContinuumSamplerV39(H3ContinuumSamplerV38):
         kwargs.update({f"reference_image_{index}": image
                        for index, image in enumerate(direct, start=1)})
         kwargs["image_references"] = extra
+        from .chunk_timings import chunk_timings_scope
         from .lora_runtime import lora_plan_scope, make_lora_plan_runtime
-        with lora_plan_scope(make_lora_plan_runtime(lora_plan)):
+        with chunk_timings_scope(chunk_timings), lora_plan_scope(make_lora_plan_runtime(lora_plan)):
             outputs = super().run(_reference_routing_settings=selectors, **kwargs)
         if not isinstance(outputs, tuple) or len(outputs) < 4:
             return outputs

@@ -130,11 +130,27 @@ def execute_v38_runtime_request(
 
     if long_run_advisory is not None:
         try:
-            advisory = long_run_advisory(
-                chunks=request.diagnostics_inputs.get("chunks"),
-                chunk_seconds=request.diagnostics_inputs.get("chunk_seconds"),
-                output_width=request.resolution.width,
-                output_height=request.resolution.height,
+            from .chunk_timings import active_chunk_durations
+
+            chunk_durations = active_chunk_durations(
+                chunks=int(request.diagnostics_inputs.get("chunks")),
+                chunk_seconds=float(request.diagnostics_inputs.get("chunk_seconds")),
+            )
+            advisory = (
+                long_run_advisory(
+                    chunks=request.diagnostics_inputs.get("chunks"),
+                    chunk_seconds=request.diagnostics_inputs.get("chunk_seconds"),
+                    output_width=request.resolution.width,
+                    output_height=request.resolution.height,
+                )
+                if chunk_durations is None else
+                long_run_advisory(
+                    chunks=request.diagnostics_inputs.get("chunks"),
+                    chunk_seconds=request.diagnostics_inputs.get("chunk_seconds"),
+                    output_width=request.resolution.width,
+                    output_height=request.resolution.height,
+                    chunk_durations=chunk_durations,
+                )
             )
         except Exception:
             advisory = None  # Display only; never fail a finished generation.

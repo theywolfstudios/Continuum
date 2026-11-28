@@ -91,6 +91,33 @@ Use **H3 Continuum LoRA Plan (Experimental)** to apply a model-only LoRA to some
 
 **Limits.** Model strength only, no CLIP strength. The sampler and sigma schedule are shared by all chunks, so a Turbo LoRA on only some chunks is not supported. Second Pass uses its own MODEL input and does not read the plan. Core re-patches the model weights when the LoRA set changes between chunks, which adds time at that boundary. The V3.8 Sampler does not have this input. Details: [LoRA Plan contract](LORA_PLAN_CONTRACT_V1.md).
 
+## Different length per chunk — Chunk Timings (Experimental)
+
+**Status:** new on main and not yet GPU-tested. Chunk lengths, storage and the assembled total are covered by CPU and JavaScript tests; the node has not been checked in a browser, and no video has been generated with it. Try it on a new Run before relying on it.
+
+`Seconds per Chunk` on the Sampler sets one length for every chunk. Use **H3 Continuum Chunk Timings (Experimental)** when some chunks should be longer or shorter.
+
+1. Add the node (`MiniMax H3/Continuum/Input`).
+2. In `Chunk Lengths`, either list the seconds in chunk order, `5, 8, 6.5`, or write one line per change, such as `2: 8` or `4-6: 10`.
+3. Connect `chunk_timings` to the V3.9 Sampler's `Chunk Timings (Optional, Experimental)` input.
+
+Chunks you do not list keep the Sampler's `Seconds per Chunk`. Each value must be 4–30 seconds. The Sampler's Status lists every chunk's length and the total; its `Total Length` shows "From connected inputs" while the node is connected.
+
+| Situation | What happens |
+|---|---|
+| The list is shorter than `Chunks` | The remaining chunks keep `Seconds per Chunk`. |
+| A chunk number is above the Sampler's `Chunks` | It is ignored until the run is that long. |
+| Two lines name the same chunk | The later line wins. |
+| The prompt uses time sections such as `[5-13s]` | They are matched against the new chunk boundaries. |
+| First and Last Image are both connected | The last two chunks are only sampled together when both are 5 seconds. Otherwise each chunk is sampled on its own. |
+| Driving Audio is connected | It is used for the full new total length. |
+
+**Saved runs.** With `Progress = On`, changing the length of Chunk 4 keeps Chunks 1–3 and regenerates from Chunk 4, because every later chunk starts at a different time. Adding the node to an existing V3.9 run works the same way. Changing `Seconds per Chunk` itself still starts from Chunk 1. Earlier Takes stay in Render History.
+
+**Lengths are approximate per chunk, exact in total.** H3 generates frame counts on a fixed grid, so a chunk can end up to about 0.7 seconds early or late (one 17-frame step), as uniform chunks already do; the next chunk makes up the difference. Finalize trims or pads the whole video to the exact total, as it does now.
+
+**Limits.** The legacy Timeline Video (VIDEO) input cannot be combined with it; Timeline Video Frames with Follow Timeline can. Second Pass refines the chunks that were generated and has no length setting of its own. The V3.8 Sampler does not have this input. Details: [Chunk Timings contract](CHUNK_TIMINGS_CONTRACT_V1.md).
+
 ## Out of memory in a later chunk while memory is free
 
 **Status:** new on main and not GPU-tested. The cause was read from ComfyUI Core source. The reported stop has not been reproduced, and whether this change removes it has not been measured.

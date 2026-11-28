@@ -25,6 +25,7 @@ from .prompts import (
     build_sampler_prompt_plan,
     make_prompt_plan,
     parse_sparse_prompt_overrides,
+    plan_chunk_durations,
     prompt_plan_report,
     validate_sparse_prompt_overrides,
 )
@@ -355,6 +356,9 @@ class H3ContinuumSamplerV2:
         if isinstance(seam_correction, bool):
             seam_correction = SEAM_CORRECTION_OFF
 
+        # Experimental Chunk Timings from the V3.9 Sampler scope; None elsewhere.
+        from ..v3.chunk_timings import active_chunk_durations
+
         prompt_plan = build_sampler_prompt_plan(
             prompt_mode=prompt_mode,
             prompt_script=prompt_script,
@@ -362,6 +366,9 @@ class H3ContinuumSamplerV2:
             prompt_plan=prompt_plan,
             chunks=int(chunks),
             chunk_seconds=float(chunk_seconds),
+            chunk_durations=active_chunk_durations(
+                chunks=int(chunks), chunk_seconds=float(chunk_seconds),
+            ),
         )
         prompt_plan = apply_prompt_overrides(
             prompt_plan,
@@ -394,6 +401,7 @@ class H3ContinuumSamplerV2:
                 chunk_seconds=float(chunk_seconds),
                 prompt_hashes=list(prompt_plan["hashes"]),
                 timeline_video_source=timeline_video_source,
+                chunk_durations=plan_chunk_durations(prompt_plan),
             )
             routing_schedule = compile_reference_routing_schedule(
                 total_chunks=int(chunks),

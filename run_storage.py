@@ -72,6 +72,12 @@ from .v3.lora_plan import (
     lora_group_sha_by_chunk,
     validate_lora_group_contracts,
 )
+from .v3.chunk_timings import (
+    ChunkTimingsError,
+    duration_overrides,
+    validate_chunk_durations,
+    validate_duration_overrides,
+)
 
 
 RUN_STORAGE_SCHEMA_VERSION = 3
@@ -201,6 +207,7 @@ def _review_contract_mismatches(stored: dict, current: dict) -> list[str]:
     for key in (
         "global", "chunk_count", "prompt_mode", "prompt_hashes",
         "last_frame_hash", "timeline_video_chunk_contracts",
+        "chunk_duration_overrides",
     ):
         compare(stored.get(key), current.get(key), key)
     return result
@@ -1241,6 +1248,10 @@ def _apply_nonce_contract(
                 routed_by_chunk[int(chunk)] = group_record["sha256"]
     lora_groups = result.get("lora_group_contracts")
     lora_by_chunk = lora_group_sha_by_chunk(lora_groups) if lora_groups else {}
+    duration_by_chunk = {
+        int(record["chunk_number"]): float(record["duration_seconds"])
+        for record in result.get("chunk_duration_overrides") or ()
+    }
     for position, prompt_hash in enumerate(result["prompt_hashes"]):
         number = position + 1
         affected = boundary > 0 and number >= boundary
@@ -1258,6 +1269,10 @@ def _apply_nonce_contract(
             # Only chunks that receive a LoRA carry this field, so every other
             # chunk keeps the contract hash it has without a LoRA Plan.
             chunk_contract["physical_group_lora_sha256"] = lora_by_chunk[number]
+        if number in duration_by_chunk:
+            # Only chunks whose length differs from Chunk Seconds carry this
+            # field; see docs/CHUNK_TIMINGS_CONTRACT_V1.md.
+            chunk_contract["duration_seconds"] = duration_by_chunk[number]
         timeline_chunks = result.get("timeline_video_chunk_contracts") or []
         if position < len(timeline_chunks):
             chunk_contract["timeline_video"] = dict(timeline_chunks[position])
@@ -1304,6 +1319,10 @@ def _nonce_lineage_hash(
     if "lora_group_contracts" in contract:
         identity["lora_group_hashes"] = [
             record["sha256"] for record in contract["lora_group_contracts"]
+        ]
+    if "chunk_duration_overrides" in contract:
+        identity["chunk_duration_overrides"] = [
+            dict(record) for record in contract["chunk_duration_overrides"]
         ]
     return _hash(identity)
 
@@ -1565,6 +1584,20 @@ def build_sampling_contract(
             )
         except LoraPlanError as exc:
             raise RunStorageError(f"LoRA Plan contract is invalid: {exc}") from exc
+    if prompt_plan.get("chunk_durations") is not None:
+        # Absent adds nothing: a run without Chunk Timings keeps its contract.
+        # Chunk Seconds stays in the common section; only differing chunks
+        # are recorded. See docs/CHUNK_TIMINGS_CONTRACT_V1.md.
+        try:
+            durations = validate_chunk_durations(
+                prompt_plan["chunk_durations"], chunks=chunks,
+                chunk_seconds=float(chunk_seconds),
+            )
+        except ChunkTimingsError as exc:
+            raise RunStorageError(f"Chunk Timings contract is invalid: {exc}") from exc
+        contract["chunk_duration_overrides"] = duration_overrides(
+            durations, chunk_seconds=float(chunk_seconds),
+        )
     lineage_sha256 = _nonce_lineage_hash(
         contract,
         timeline_video_chunk_contracts=timeline_chunk_contracts,
@@ -1831,6 +1864,26 @@ def _manifest_sampling_identity(manifest: dict[str, Any]) -> tuple[str, str]:
                        item.get("physical_group_lora_sha256") != expected_lora.get(index + 1)
                        for index, item in enumerate(lora_chunks))):
             raise RunStorageError("stored LoRA group/chunk contracts disagree")
+    duration_records = contract.get("chunk_duration_overrides")
+    duration_chunks = contract.get("chunk_contracts")
+    if duration_records is not None or (isinstance(duration_chunks, list) and any(
+            isinstance(item, dict) and "duration_seconds" in item
+            for item in duration_chunks)):
+        try:
+            expected_duration = {
+                record["chunk_number"]: record["duration_seconds"]
+                for record in validate_duration_overrides(
+                    duration_records, chunk_count=int(contract["chunk_count"]),
+                    chunk_seconds=float((contract.get("global") or {})["chunk_seconds"]),
+                )
+            }
+        except (ChunkTimingsError, KeyError, TypeError, ValueError) as exc:
+            raise RunStorageError(f"stored chunk duration contract is invalid: {exc}") from exc
+        if (not isinstance(duration_chunks, list)
+                or any(not isinstance(item, dict) or
+                       item.get("duration_seconds") != expected_duration.get(index + 1)
+                       for index, item in enumerate(duration_chunks))):
+            raise RunStorageError("stored chunk duration/chunk contracts disagree")
     contract_revision_id, contract_sha256 = revision_identity(contract)
     if str(manifest.get("contract_sha256", "")) != contract_sha256:
         raise RunStorageError("stored sampling contract SHA-256 is invalid")
@@ -3015,7 +3068,8 @@ class RunStorageController:
                     "Take selection cannot be combined with manual Regenerate From"
                 )
             source_lineage = str(contract.get("nonce_lineage_sha256", ""))
-            if "reference_group_contracts" in contract or "lora_group_contracts" in contract:
+            if ("reference_group_contracts" in contract or "lora_group_contracts" in contract
+                    or "chunk_duration_overrides" in contract):
                 _, all_takes, _ = self._provenance_catalog()
                 selected_take = all_takes.get(self.take_revision_id)
                 if selected_take is not None:
@@ -3048,7 +3102,8 @@ class RunStorageController:
                     failed_group = len(compatible_entries) + 1
                     plan_label = (
                         "Reference plan" if "reference_group_contracts" in contract
-                        else "LoRA Plan"
+                        else "LoRA Plan" if "lora_group_contracts" in contract
+                        else "Chunk Timings"
                     )
                     raise RunStorageError(
                         f"selected Take is incompatible with the new {plan_label} "

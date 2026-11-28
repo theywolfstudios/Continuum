@@ -101,10 +101,15 @@ def validate_sparse_prompt_overrides(overrides,*,chunks):
         validated[index]=_normalize_prompt(prompt,label=f"Clip {index} Override")
     if not validated: raise PromptPlanError("Sparse Clip Overrides contains no overrides")
     return validated
-def _parse_timeline(script,chunks,chunk_seconds,*,ignore_list_separators=False):
+def _chunk_window(chunk_index,chunk_seconds,chunk_durations):
+    # Without Chunk Timings keep the established uniform expressions exactly.
+    if chunk_durations is None: return (chunk_index-1)*chunk_seconds,chunk_index*chunk_seconds
+    import math
+    return math.fsum(chunk_durations[:chunk_index-1]),math.fsum(chunk_durations[:chunk_index])
+def _parse_timeline(script,chunks,chunk_seconds,*,ignore_list_separators=False,chunk_durations=None):
     sections=_parse_timeline_sections(script,ignore_list_separators=ignore_list_separators); prompts=[]; notes=[]; diagnostics=[]
     if _timeline_preamble(script,ignore_list_separators=ignore_list_separators): notes.append("applied timeline preamble to all chunks")
-    seen_chunks={}; total_end=chunks*chunk_seconds; usable=[]
+    seen_chunks={}; total_end=chunks*chunk_seconds if chunk_durations is None else _chunk_window(chunks,chunk_seconds,chunk_durations)[1]; usable=[]
     for item in sections:
         if item["kind"]=="chunk":
             index=int(item["index"])
@@ -125,7 +130,7 @@ def _parse_timeline(script,chunks,chunk_seconds,*,ignore_list_separators=False):
         if chunk_sections:
             selected=chunk_sections[0]; prompts.append(selected["prompt"]); previous_prompt=selected["prompt"]; previous_source=f"{selected['source']} at line {selected['line_number']}"
             diagnostics.append({"level":"info","code":"H3C-P000","message":f"Chunk {chunk_index} source: {previous_source}"}); continue
-        start=(chunk_index-1)*chunk_seconds; end=chunk_index*chunk_seconds; scored=[]
+        start,end=_chunk_window(chunk_index,chunk_seconds,chunk_durations); scored=[]
         for order,item in enumerate(sections):
             if item["kind"]!="time": continue
             overlap=max(0.0,min(end,item["end"])-max(start,item["start"]))
@@ -165,10 +170,17 @@ def resolve_prompt_mode(mode,script):
     if mode in explicit: return explicit[mode]
     if mode in (PROMPT_MODE_FIXED,PROMPT_MODE_LIST,PROMPT_MODE_TIMELINE): return mode
     return PROMPT_MODE_FIXED
-def make_prompt_plan(*,mode,script,chunks,chunk_seconds):
+def _validated_chunk_durations(chunk_durations,*,chunks,chunk_seconds):
+    # Experimental Chunk Timings. None keeps every existing plan unchanged.
+    if chunk_durations is None: return None
+    from ..v3.chunk_timings import ChunkTimingsError,validate_chunk_durations
+    try: return validate_chunk_durations(chunk_durations,chunks=chunks,chunk_seconds=chunk_seconds)
+    except ChunkTimingsError as exc: raise PromptPlanError(f"prompt-plan {exc}") from None
+def make_prompt_plan(*,mode,script,chunks,chunk_seconds,chunk_durations=None):
     chunks=int(chunks); chunk_seconds=float(chunk_seconds)
     if not 1<=chunks<=MAX_CHUNKS: raise PromptPlanError(f"chunks must be between 1 and {MAX_CHUNKS}")
     if not CHUNK_SECONDS_MIN<=chunk_seconds<=CHUNK_SECONDS_MAX: raise PromptPlanError(f"chunk_seconds must be between {CHUNK_SECONDS_MIN:.1f} and {CHUNK_SECONDS_MAX:.1f}")
+    chunk_durations=_validated_chunk_durations(chunk_durations,chunks=chunks,chunk_seconds=chunk_seconds)
     notes=[]; diagnostics=[]
     try:
         resolved_mode=resolve_prompt_mode(mode,script)
@@ -182,7 +194,7 @@ def make_prompt_plan(*,mode,script,chunks,chunk_seconds):
                 diagnostics.extend({"level":"info","code":"H3C-P000","message":f"Chunk {index+1} source: List section {source}"} for index,source in enumerate(list_sources))
         elif resolved_mode==PROMPT_MODE_TIMELINE:
             mixed_syntax=_has_list_separator(script)
-            prompts,parse_notes,diagnostics=_parse_timeline(script,chunks,chunk_seconds,ignore_list_separators=mixed_syntax); notes.extend(parse_notes)
+            prompts,parse_notes,diagnostics=_parse_timeline(script,chunks,chunk_seconds,ignore_list_separators=mixed_syntax,chunk_durations=chunk_durations); notes.extend(parse_notes)
             if mixed_syntax: diagnostics.insert(0,_mixed_syntax_diagnostic(timeline_active=True))
         else: raise PromptPlanError(f"unknown prompt mode: {resolved_mode!r}")
     except (PromptPlanError,TypeError,ValueError) as exc:
@@ -191,6 +203,7 @@ def make_prompt_plan(*,mode,script,chunks,chunk_seconds):
         diagnostics=[{"level":"warning","code":"H3C-P100","message":str(exc)}]
     result={"magic":PROMPT_PLAN_MAGIC,"schema_version":PROMPT_PLAN_SCHEMA_VERSION,"mode":resolved_mode,"chunks":chunks,"chunk_seconds":chunk_seconds,"prompts":prompts,"hashes":[prompt_hash(p) for p in prompts],"notes":notes}
     if diagnostics: result["diagnostics"]=diagnostics
+    if chunk_durations is not None: result["chunk_durations"]=list(chunk_durations)
     return result
 def validate_prompt_plan(plan):
     if not isinstance(plan,dict) or plan.get("magic")!=PROMPT_PLAN_MAGIC: raise PromptPlanError("invalid H3 Continuum prompt plan")
@@ -207,19 +220,26 @@ def validate_prompt_plan(plan):
         if hashes[index]!=prompt_hash(prompt): raise PromptPlanError(f"prompt-plan hash mismatch at chunk {index+1}")
     diagnostics=plan.get("diagnostics")
     if diagnostics is not None and (not isinstance(diagnostics,list) or not all(isinstance(item,dict) for item in diagnostics)): raise PromptPlanError("prompt-plan diagnostics are invalid")
+    if "chunk_durations" in plan: _validated_chunk_durations(plan["chunk_durations"],chunks=chunks,chunk_seconds=chunk_seconds)
     return plan
-def build_sampler_prompt_plan(*,prompt_mode,prompt_script,sequence_prompt,prompt_plan,chunks,chunk_seconds):
+def plan_chunk_durations(plan):
+    """Per-chunk seconds of a validated plan, or None when every chunk uses chunk_seconds."""
+    if "chunk_durations" not in plan: return None
+    return _validated_chunk_durations(plan["chunk_durations"],chunks=int(plan["chunks"]),chunk_seconds=float(plan["chunk_seconds"]))
+def build_sampler_prompt_plan(*,prompt_mode,prompt_script,sequence_prompt,prompt_plan,chunks,chunk_seconds,chunk_durations=None):
     chunks=int(chunks); chunk_seconds=float(chunk_seconds)
-    if sequence_prompt is not None: return make_prompt_plan(mode=prompt_mode,script=sequence_prompt,chunks=chunks,chunk_seconds=chunk_seconds)
+    if sequence_prompt is not None: return make_prompt_plan(mode=prompt_mode,script=sequence_prompt,chunks=chunks,chunk_seconds=chunk_seconds,chunk_durations=chunk_durations)
     if prompt_plan is not None:
         plan=validate_prompt_plan(prompt_plan)
         prompts=list(plan["prompts"])
         if len(prompts)<chunks: prompts.extend([prompts[-1] if prompts else ""]*(chunks-len(prompts)))
         elif len(prompts)>chunks: prompts=prompts[:chunks]
         result=dict(plan); result["chunks"]=chunks; result["chunk_seconds"]=chunk_seconds; result["prompts"]=prompts; result["hashes"]=[prompt_hash(p) for p in prompts]
-        if int(plan["chunks"])!=chunks or abs(float(plan["chunk_seconds"])-chunk_seconds)>1e-6: result["notes"]=list(plan.get("notes") or [])+["adapted connected prompt plan to Sampler chunk settings"]
+        result.pop("chunk_durations",None)
+        if chunk_durations is not None: result["chunk_durations"]=list(_validated_chunk_durations(chunk_durations,chunks=chunks,chunk_seconds=chunk_seconds))
+        if int(plan["chunks"])!=chunks or abs(float(plan["chunk_seconds"])-chunk_seconds)>1e-6 or plan.get("chunk_durations")!=result.get("chunk_durations"): result["notes"]=list(plan.get("notes") or [])+["adapted connected prompt plan to Sampler chunk settings"]
         return validate_prompt_plan(result)
-    return make_prompt_plan(mode=prompt_mode,script=prompt_script,chunks=chunks,chunk_seconds=chunk_seconds)
+    return make_prompt_plan(mode=prompt_mode,script=prompt_script,chunks=chunks,chunk_seconds=chunk_seconds,chunk_durations=chunk_durations)
 def apply_prompt_overrides(plan,overrides):
     plan=validate_prompt_plan(plan); prompts=list(plan["prompts"]); replaced=[]
     for index,value in enumerate(overrides[:int(plan["chunks"])]):
@@ -231,6 +251,10 @@ def apply_prompt_overrides(plan,overrides):
 def prompt_plan_report(plan):
     plan=validate_prompt_plan(plan); unique=len(set(plan["hashes"])); note="; ".join(plan.get("notes") or [])
     result=f"Prompt plan: {plan['mode']}; {plan['chunks']} chunks; {unique} unique prompt(s); {plan['chunk_seconds']:.3f}s per chunk."
+    durations=plan_chunk_durations(plan)
+    if durations is not None:
+        from ..v3.chunk_timings import format_chunk_durations
+        result=f"Prompt plan: {plan['mode']}; {plan['chunks']} chunks; {unique} unique prompt(s).\n"+format_chunk_durations(durations,chunk_seconds=float(plan["chunk_seconds"]))
     if note: result+=" "+note+"."
     diagnostics=list(plan.get("diagnostics") or [])
     if not diagnostics: return result+"\nPrompt Preflight: OK."

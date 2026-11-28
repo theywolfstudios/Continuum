@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import torch
@@ -24,9 +25,18 @@ def make_assembly_plan(
     *,
     chunk_seconds: float,
     preserve_final_frame: bool,
+    chunk_durations=None,
 ) -> dict[str, Any]:
     if not entries:
         raise AssemblyPlanError("cannot create an assembly plan for an empty sequence")
+    if chunk_durations is not None:
+        # Experimental Chunk Timings: one length per entry. A schedule with no
+        # differing length is the uniform plan, without the extra key.
+        chunk_durations = [float(value) for value in chunk_durations]
+        if len(chunk_durations) != len(entries):
+            raise AssemblyPlanError("chunk durations do not match the assembled chunks")
+        if all(value == float(chunk_seconds) for value in chunk_durations):
+            chunk_durations = None
 
     chunks: list[dict[str, Any]] = []
     width = height = None
@@ -72,6 +82,9 @@ def make_assembly_plan(
         "preserve_final_frame": bool(preserve_final_frame),
         "chunks": chunks,
     }
+    if chunk_durations is not None:
+        result["chunk_durations"] = chunk_durations
+        result["target_frames"] = int(round(math.fsum(chunk_durations) * FPS))
     return validate_assembly_plan(result)
 
 
@@ -359,14 +372,20 @@ def prepare_physical_decode_entries(
     preserve_final_frame: bool,
     terminal_merged: bool,
     terminal_initial_pair: bool | None = None,
+    chunk_durations=None,
 ):
-    """Return external-VAE decode units while preserving logical plan metadata."""
+    """Return external-VAE decode units while preserving logical plan metadata.
+
+    ``chunk_durations`` (Experimental Chunk Timings) lists the length of each
+    entry; ``None`` keeps ``len(entries) * chunk_seconds`` as the target.
+    """
 
     logical_entries = list(entries)
     plan = make_assembly_plan(
         logical_entries,
         chunk_seconds=float(chunk_seconds),
         preserve_final_frame=bool(preserve_final_frame),
+        chunk_durations=chunk_durations,
     )
     logical_chunk_indices = [
         int(chunk["chunk_index"]) for chunk in plan["chunks"]
