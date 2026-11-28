@@ -689,7 +689,7 @@ function compactValue(value, maximumFractionDigits = 1) {
 }
 
 function durationLabel(node, chunks = null) {
-    if (linkedInput(node, [CHUNKS_WIDGET, "chunk_seconds"])) {
+    if (linkedInput(node, [CHUNKS_WIDGET, "chunk_seconds", "chunk_timings"])) {
         return "From connected inputs";
     }
     const chunkCount = Number(chunks ?? findWidget(node, CHUNKS_WIDGET)?.value ?? 1);
@@ -819,7 +819,7 @@ function readySummary(node) {
             detail: "Review Each Chunk must keep Base Seed unchanged between Queue runs.",
         };
     }
-    const duration = linkedInput(node, [CHUNKS_WIDGET, "chunk_seconds"])
+    const duration = linkedInput(node, [CHUNKS_WIDGET, "chunk_seconds", "chunk_timings"])
         ? "Duration from connected inputs"
         : `${compactValue(chunks)} × ${compactValue(seconds)}s = ${durationLabel(node)}`;
     const output = sizeSource === SIZE_SOURCE_FIRST_IMAGE

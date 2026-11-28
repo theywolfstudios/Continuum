@@ -1,5 +1,26 @@
 # Public development log
 
+## 2026-11-28 — Chunk Timings: a length per chunk
+
+The sampling loop was already length-generic: each continuation requests the
+frames between its cumulative target and the frames already kept, so a
+per-chunk length only changes that target. Uniform length was assumed in
+the target expressions, the timeline prompt windows, the assembled total,
+Driving Audio's prefix, the terminal-merge gate and the Session reuse check.
+Carry one resolved length per chunk in the prompt plan, which already
+reaches the sequence and Run Storage, and only when some chunk differs from
+Chunk Seconds; every uniform expression is kept verbatim for the unchanged
+path and for unchanged prefixes. Keep Chunk Seconds in the common contract
+and record only differing chunks, in the chunk contract and the lineage, as
+the LoRA Plan does, so a changed length keeps every chunk before it. Deliver
+the helper's bundle through a scope on the V3.9 Sampler rather than a new
+Sampler ID. Allow the merged First + Last pair only for two 5-second chunks,
+and refuse the legacy VIDEO Timeline input instead of mapping it. Cover
+parsing, plan validation, contract identity, prefix import, real Run Storage
+Review queues, the sampling loop with stand-ins for Core, Session reuse,
+assembly targets and the Sampler scope; one JavaScript case for the
+duration label. CPU only; see PROJECT_STATE.md.
+
 ## 2026-11-26 — Core sampling allocations between chunks
 
 A V3.9 run on a 32 GB card stopped in the Sampler with an out-of-memory

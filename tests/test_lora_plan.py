@@ -446,10 +446,11 @@ def test_sampler_input_is_appended_last_and_only_on_v39():
     new = driving_nodes.H3ContinuumSamplerV39.INPUT_TYPES()
     assert "lora_plan" not in old["optional"] and "lora_plan" not in old["required"]
     assert new["required"] == old["required"]
-    assert list(new["optional"])[-1] == "lora_plan"
+    # Chunk Timings was appended after the LoRA Plan input.
+    assert list(new["optional"])[-2:] == ["lora_plan", "chunk_timings"]
     assert new["optional"]["lora_plan"][0] == LORA_PLAN_TYPE
-    without = [name for name in new["optional"] if name != "lora_plan"]
-    assert without == list(new["optional"])[:-1]
+    without = [name for name in new["optional"] if name not in ("lora_plan", "chunk_timings")]
+    assert without == list(new["optional"])[:-2]
 
 
 def test_sampler_scopes_the_plan_and_does_not_forward_it(monkeypatch):

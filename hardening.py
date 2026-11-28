@@ -82,6 +82,20 @@ def validate_assembly_plan_contract(plan: Mapping[str, Any]) -> None:
 
     target_frames = _strict_int("assembly_plan.target_frames", plan.get("target_frames"), 1)
     expected_target = int(round(len(chunks) * chunk_seconds * fps))
+    if "chunk_durations" in plan:
+        # Experimental Chunk Timings: present only when a length differs.
+        durations = plan["chunk_durations"]
+        if not isinstance(durations, list) or len(durations) != len(chunks):
+            raise ValueError("assembly_plan.chunk_durations does not match chunks")
+        for value in durations:
+            if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                    or not math.isfinite(float(value)) or float(value) <= 0):
+                raise ValueError("assembly_plan.chunk_durations must be finite and positive")
+        expected_target = int(round(math.fsum(float(value) for value in durations) * fps))
+        if target_frames != expected_target:
+            raise ValueError(
+                "assembly_plan.target_frames does not match sum(chunk_durations) * fps"
+            )
     if target_frames != expected_target:
         raise ValueError(
             "assembly_plan.target_frames does not match chunks * chunk_seconds * fps"

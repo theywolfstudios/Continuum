@@ -22,6 +22,7 @@ EXPECTED_PUBLIC_NODE_DISPLAY_NAMES = {
     "H3DecodeCacheHelper": "Decode Cache Helper",
     "H3ContinuumVideoAdapter": "H3 Continuum Video Adapter",
     "H3ContinuumLoraPlan": "H3 Continuum LoRA Plan (Experimental)",
+    "H3ContinuumChunkTimings": "H3 Continuum Chunk Timings (Experimental)",
 }
 
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import math
 from typing import Any
 
 import torch
@@ -904,11 +905,13 @@ def long_run_decode_advisory(
     chunk_seconds: Any,
     output_width: Any,
     output_height: Any,
+    chunk_durations: Any = None,
 ) -> str | None:
     """Estimate decoded IMAGE size for runs above the former 16-chunk limit.
 
     Display only. Runs of 16 chunks or fewer return ``None`` so their Status
-    text is unchanged.
+    text is unchanged. ``chunk_durations`` (Experimental Chunk Timings) gives
+    each chunk's length when they differ.
     """
 
     count = int(chunks)
@@ -917,9 +920,14 @@ def long_run_decode_advisory(
     seconds = float(chunk_seconds)
     width, height = int(output_width), int(output_height)
     frames = max(1, int(round(count * seconds * FPS)))
+    length = f"{count} chunks x {seconds:g}s"
+    if chunk_durations is not None:
+        total = math.fsum(float(value) for value in chunk_durations)
+        frames = max(1, int(round(total * FPS)))
+        length = f"{count} chunks totalling {total:g}s"
     gib = frames * width * height * 3 * 4 / 1024**3
     return (
-        f"Long run: {count} chunks x {seconds:g}s is about {frames} frames. "
+        f"Long run: {length} is about {frames} frames. "
         f"Decoded at {width} x {height} they need about {gib:.1f} GiB as "
         "float32 IMAGE data. Decode Cache Helper and the Finalize Disk-backed "
         "buffer can keep decoded frames on disk."

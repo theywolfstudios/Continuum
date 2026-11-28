@@ -1,5 +1,33 @@
 # Public source status
 
+## Chunk Timings (Experimental) — source update
+
+Add the H3 Continuum Chunk Timings helper and an optional `chunk_timings`
+input, appended after `lora_plan`, on the V3.9 Sampler. Selected chunks get
+their own length (4–30 s); the rest keep Chunk Seconds. Each chunk samples
+toward its cumulative frame target, and the assembly plan's target is the
+sum of the lengths. Storage identity keeps Chunk Seconds in the common
+section and records only differing chunks, per chunk and in the lineage
+(docs/CHUNK_TIMINGS_CONTRACT_V1.md): without an override the Sampling
+Contract, Session and assembly plan are byte-identical, and chunks before
+the first changed length are reused. The merged First + Last pair needs both
+final chunks at 5 s; the legacy VIDEO Timeline input is refused with an
+override. Sampling v6 / Graph v4, stored formats, existing node IDs,
+socket/widget order and official workflow bytes are unchanged. Public
+registration is fourteen nodes. CPU/JavaScript without ComfyUI Core
+installed, through tools/validate.ps1 without the runtime step: 2,147
+passed, 384 skipped (Core-dependent). An earlier run of the same tree had
+one failure in the intermittent
+test_concurrent_hits_do_not_share_returned_tensor_or_corrupt_cache; run alone
+eight times it failed 2 times on this change and 5 times on the unchanged
+tree. The change adds 45 Python tests and one JavaScript case. Offline
+public registration check: no issues. All hashes in both manifests
+verified. Not run: Core-dependent tests, live loading, browser display and
+save/reload of the helper and the Sampler's new input, and any GPU
+generation with custom lengths. Japanese documents are not updated. Package
+version remains 3.10.3; no Release or Registry submission accompanies this
+update.
+
 ## Reference Images: 24 slots and Tagged chunks — source update
 
 `H3 Continuum Reference Images V3.9` has 24 fixed slots; slots 10–24 are

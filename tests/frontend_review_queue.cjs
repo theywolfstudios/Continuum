@@ -550,6 +550,16 @@ await test('duration manual entry and serialized values survive connect disconne
  const values=await e.inputs(restored);assert.equal(values.chunks,6);assert.equal(values.chunk_seconds,2.5);
  assert(!Object.hasOwn(values,'Chunks'));assert(!Object.hasOwn(values,'Seconds per Chunk'));
 });
+await test('connected Chunk Timings replace the chunks x seconds total',async e=>{
+ const n=e.makeNode();e.w(n,'Chunks').callback(3);e.w(n,'Seconds per Chunk').callback(5);
+ n.__h3ContinuumIntuitiveUxRefresh();
+ assert.equal(e.w(n,'Total Length').value,'15 seconds');
+ const input={name:'chunk_timings',type:'H3_CONTINUUM_CHUNK_TIMINGS',link:43};
+ n.inputs.push(input);n.__h3ContinuumIntuitiveUxRefresh();
+ assert.equal(e.w(n,'Total Length').value,'From connected inputs');
+ input.link=null;n.__h3ContinuumIntuitiveUxRefresh();
+ assert.equal(e.w(n,'Total Length').value,'15 seconds');
+});
 await test('external duration links remain links through actual review Queue adapter',async e=>{
  const n=e.makeNode();e.w(n,'chunks').value=1;
  n.inputs.push({name:'chunks',type:'INT',widget:{name:'chunks'},link:42});

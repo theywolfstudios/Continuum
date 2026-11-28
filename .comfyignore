@@ -120,3 +120,6 @@ write-h3-v39-reference-prompts/
 
 # LoRA Plan contract, linked from the user guide.
 !docs/LORA_PLAN_CONTRACT_V1.md
+
+# Chunk Timings contract, linked from the user guide.
+!docs/CHUNK_TIMINGS_CONTRACT_V1.md
